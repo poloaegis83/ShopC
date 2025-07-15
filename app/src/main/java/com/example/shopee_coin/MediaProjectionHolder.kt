@@ -1,0 +1,38 @@
+package com.example.shopee_coin
+
+import android.content.Intent
+
+object MediaProjectionHolder {
+    var resultCode: Int = -1
+    var resultData: Intent? = null
+}
+
+object GlobalValueHolder {
+    val UpValue: Float = 0.4f
+    val DownValue: Float = 0.2f
+    val MinusValue: Float = 0.1f
+}
+
+data class CoinStrategy(
+    val Start_Hour: Int,
+    val Start_Mins: Int,
+    val End_Hour: Int,
+    val End_Mins: Int,
+    val PeriodUpValue: Float,
+    val PeriodDownValue: Float,
+    val CoinValueMinus: Float,
+    val RefreshCount: Int
+)
+
+val DefaultStrategies = listOf(
+    //早上
+    CoinStrategy(8, 0, 11, 30, 0.3f, 0.2f, 0.1f, 5),
+    //中午
+    CoinStrategy(11, 10, 13, 30, 0.4f, 0.25f, 0.05f,5),
+    //下午
+    CoinStrategy(14, 0, 17, 40, 0.35f, 0.25f, 0.1f,5),
+    //傍晚
+    CoinStrategy(17, 40, 19, 30, 0.3f, 0.2f, 0.05f,5),
+    //晚上
+    CoinStrategy(19, 30, 22, 30, 0.4f, 0.3f, 0.1f,5),
+)
