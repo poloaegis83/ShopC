@@ -328,7 +328,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         Log.d("OCR_Result", "onResumeonResumeonResumeonResumeonResumeonResumeonResumeonResumeonResumeonResume")
 
-        if (MediaProjectionHolder.resultData != null && mediaProjection == null) {
+        /*if (MediaProjectionHolder.resultData != null && mediaProjection == null) {
             val mediaProjectionManager =
                 getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mediaProjectionManager.getMediaProjection(
@@ -337,7 +337,7 @@ class MainActivity : ComponentActivity() {
             )
 
             Toast.makeText(this, "✅ 螢幕擷取授權成功", Toast.LENGTH_SHORT).show()
-        }
+        }*/
     }
 
 }

@@ -595,7 +595,7 @@ class ScreenCaptureService : Service() {
     private suspend fun QuickRefreshPage () {
         delay(100L)
         MoveNextPage()
-        delay(650L)
+        delay(1000L)
         MovePreviousPage ()
         delay(100L)
     }
@@ -604,16 +604,16 @@ class ScreenCaptureService : Service() {
     private fun MovePreviousPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 3.5f
-        TouchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 300)
+        val MoveDistance  = metrics.heightPixels / 3f
+        TouchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 700)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun MoveNextPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 3.5f
-        TouchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, 300)
+        val MoveDistance  = metrics.heightPixels / 3f
+        TouchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, 700)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
