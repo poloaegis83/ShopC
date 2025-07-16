@@ -350,6 +350,7 @@ class ScreenCaptureService : Service() {
         //
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
+        val regex7 = Regex("^再試一次")
         val regex6 = Regex("網路連線")
         val regex5 = Regex("寵粉紅包雨")
         val regex4 = Regex("未獲得")
@@ -373,6 +374,7 @@ class ScreenCaptureService : Service() {
                         val matches4 = regex4.find(line.text)
                         val matches5 = regex5.find(line.text)
                         val matches6 = regex6.find(line.text)
+                        val matches7 = regex7.find(line.text)
 
                         if (matches1 != null){
                             Log.d("RegexMatch", "找到  本場直播還可領取")
@@ -403,6 +405,15 @@ class ScreenCaptureService : Service() {
                             serviceScope.launch {
                                 QuickRefreshPage()
                             }
+                        }
+                        if (matches7 != null) {
+                            val boxc = line.boundingBox
+                            if (boxc != null){
+                                val Position_x = (boxc.centerX()).toFloat()
+                                val Position_y = (boxc.centerY()).toFloat()
+                                TouchClick(Position_x, Position_y)
+                            }
+
                         }
 
                     }
