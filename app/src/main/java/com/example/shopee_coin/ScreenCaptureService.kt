@@ -475,8 +475,6 @@ class ScreenCaptureService : Service() {
                 context = this, // activity context
                 onResult = { resultText ->
                     try {
-
-
                         OuterReg@ for (block in resultText.textBlocks) {
                             for (line in block.lines) {
                                 //Log.d("OCR_Line", "文字內容：${line.text}")
@@ -530,34 +528,14 @@ class ScreenCaptureService : Service() {
                                         CoinStates = CState.SEARCHING_COIN
                                         break@OuterReg
                                     }
-                                }
-                                else {
+                                } else {
                                     CoinStates = CState.PAGE_COIN_NOT_FIND
                                 }
                             }
                         }
 
-                        if (CoinStates == CState.GET_COIN_READY) {
-                            //
-                            // 如果 GET_COIN_READY 太多次 代表 主播跑了
-                            //
-                            GetCoinFreezeCount += 1
-                            Log.d("move", "太多次 代表 主播跑了 +1")
-                        } else {
-                            Log.d("move", "GET_COIN_READY = 0")
-                            GetCoinFreezeCount = 0
-                        }
-                        if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
-                            NotFindConter += 1
-                        }
-                        if (NotFindConter >= 2 || GetCoinFreezeCount > 2){
-                            Log.d("move", "MoveNextPage")
-                            CoinStates = CState.NOT_FIND_DOING_FRESH
-                            //AddCoinList(CoinValueToRecord)
-                            FindNextRoom()
-                            NotFindConter = 0
-                            GetCoinFreezeCount = 0
-                        }
+                        GetCoinFreezeHandler()
+                        NotFindCoinHandler()
                         Log.d("gIsCapturing", "IsCapturing = false")
 
                     } finally {
@@ -572,6 +550,43 @@ class ScreenCaptureService : Service() {
                 }
             )
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun NotFindCoinHandler() {
+        if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
+            NotFindConter += 1
+        }
+        if (NotFindConter >= 2){
+            Log.d("move", "MoveNextPage")
+            CoinStates = CState.NOT_FIND_DOING_FRESH
+            //AddCoinList(CoinValueToRecord)
+            FindNextRoom()
+            NotFindConter = 0
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun GetCoinFreezeHandler() {
+
+        if (CoinStates == CState.GET_COIN_READY) {
+            //
+            // 如果 GET_COIN_READY 太多次 代表 主播可能跑了
+            //
+            GetCoinFreezeCount += 1
+            Log.d("move", "GET_COIN_READY 太多次 代表 主播可能跑了 +1")
+        } else {
+            Log.d("move", "GET_COIN_READY = 0")
+            GetCoinFreezeCount = 0
+        }
+
+        if (GetCoinFreezeCount > 2){
+            serviceScope.launch {
+                QuickRefreshPage()
+            }
+            GetCoinFreezeCount = 0
+        }
+
     }
 
 
