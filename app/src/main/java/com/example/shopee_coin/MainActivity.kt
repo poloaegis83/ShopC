@@ -2,6 +2,8 @@ package com.example.shopee_coin
 
 // 新增 import
 
+import android.annotation.SuppressLint
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
@@ -20,12 +22,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -34,11 +38,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
+import java.util.Calendar
 
 //var isOn: Boolean = false
 
@@ -108,8 +115,11 @@ class MainActivity : ComponentActivity() {
 
     }
 
+    @SuppressLint("DefaultLocale")
     @Composable
     fun SetPageItems() {
+        var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
+        var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
 
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
@@ -119,17 +129,6 @@ class MainActivity : ComponentActivity() {
         var text2 by remember { mutableStateOf("") }
 
         Column(modifier = Modifier.padding(top = 50.dp, start = 20.dp)) {
-            TextField(
-                value = text1,
-                onValueChange = { text1 = it },
-                label = { Text("輸入 預期值 (預設0.4)") },
-                singleLine = true,
-                modifier = Modifier.width(componentWidth)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("預期值：$text1")
-
-            Spacer(modifier = Modifier.height(12.dp)) // 兩個 TextField 間隔
 
             TextField(
                 value = text2,
@@ -140,13 +139,6 @@ class MainActivity : ComponentActivity() {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text("底線值：$text2")
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { SetUpValue( text1.toFloatOrNull() ?: 0f  ) },
-                modifier = Modifier.width(componentWidth)
-            ) {
-                Text("蝦皮 設定預期值")
-            }
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f ) },
@@ -163,6 +155,90 @@ class MainActivity : ComponentActivity() {
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("tips: 開始 蝦幣偵測後 懸浮按鈕 打開到ON 才能做動")
+
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isLowEndDevice,
+                    onCheckedChange = { checked ->
+                        isLowEndDevice = checked
+                        GlobalValueHolder.IsLowEndDevice = checked
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Low-End Device(低階裝置用，反應變慢)")
+            }
+            val initialStartTime = String.format("%02d:%02d", GlobalValueHolder.StartHour, GlobalValueHolder.StartMinute)
+            val initialEndTime = String.format("%02d:%02d", GlobalValueHolder.EndHour, GlobalValueHolder.EndMinute)
+
+            var selectedTimeStart by remember { mutableStateOf(initialStartTime) }
+            var selectedTimeEnd by remember { mutableStateOf(initialEndTime) }
+
+            val context = LocalContext.current
+            val calendar = Calendar.getInstance()
+
+            val timePickerDialogStart = remember {
+                TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        selectedTimeStart = String.format("%02d:%02d", hourOfDay, minute)
+                        GlobalValueHolder.StartHour = hourOfDay
+                        GlobalValueHolder.StartMinute = minute
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    true
+                )
+            }
+
+            val timePickerDialogEnd = remember {
+                TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        selectedTimeEnd = String.format("%02d:%02d", hourOfDay, minute)
+                        GlobalValueHolder.EndHour = hourOfDay
+                        GlobalValueHolder.EndMinute = minute
+                    },
+                    calendar.get(Calendar.HOUR_OF_DAY),
+                    calendar.get(Calendar.MINUTE),
+                    true
+                )
+            }
+
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = isTimeLimit,
+                    onCheckedChange = { checked ->
+                        isTimeLimit = checked
+                        GlobalValueHolder.IsTimeLimit = checked
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "啟用 時段內偵測")
+            }
+
+            if (isTimeLimit) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Button(onClick = { timePickerDialogStart.show() }) {
+                        Text("選擇開始時間")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("開始時間：$selectedTimeStart")
+                }
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Button(onClick = { timePickerDialogEnd.show() }) {
+                        Text("選擇結束時間")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("結束時間：$selectedTimeEnd")
+                }
+            }
+
         }
     }
 
@@ -188,28 +264,10 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "底線值太大", Toast.LENGTH_SHORT).show()
             return
         }
-        if (DownValue > GlobalValueHolder.UpValue) {
-            Toast.makeText(this, "底線值 不可大於 預期值", Toast.LENGTH_SHORT).show()
-            return
-        }
-        //GlobalValueHolder.DownValue = DownValue
+        GlobalValueHolder.DownValue = DownValue
         Log.d("GlobalValueHolder", "DownValue ${GlobalValueHolder.DownValue}")
     }
-    private fun SetUpValue(UpValue:Float){
-        if (UpValue <= 0.01f) {
-            Toast.makeText(this, "預期值太小", Toast.LENGTH_SHORT).show()
-            return
-        } else if  (UpValue >= 100f) {
-            Toast.makeText(this, "預期值太大", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (UpValue < GlobalValueHolder.DownValue) {
-            Toast.makeText(this, "預期值 不可小於 底線值", Toast.LENGTH_SHORT).show()
-            return
-        }
-        //GlobalValueHolder.UpValue = UpValue
-        Log.d("GlobalValueHolder", "UpValue ${GlobalValueHolder.UpValue}")
-    }
+
     //
     // MediaProjection的截圖
     //

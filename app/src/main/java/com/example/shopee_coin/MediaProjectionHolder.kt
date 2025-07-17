@@ -8,9 +8,13 @@ object MediaProjectionHolder {
 }
 
 object GlobalValueHolder {
-    val UpValue: Float = 0.4f
-    val DownValue: Float = 0.2f
-    val MinusValue: Float = 0.1f
+    var DownValue: Float = 0f
+    var IsLowEndDevice: Boolean = false
+    var StartHour: Int = 8
+    var StartMinute: Int = 0
+    var EndHour: Int = 22
+    var EndMinute: Int = 0
+    var IsTimeLimit: Boolean = false
 }
 
 data class CoinStrategy(

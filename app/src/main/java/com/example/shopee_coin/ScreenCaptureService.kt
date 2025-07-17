@@ -31,6 +31,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -53,6 +54,8 @@ class ScreenCaptureService : Service() {
     var CoinValueSatisfy = GlobalValueHolder.DownValue
     var Full_refresh_Position_x  = 0f
     var Full_refresh_Position_y  = 0f
+
+    var GetCoinFreezeCount = 0
 
     var CoinStates = CState.COIN_START
 
@@ -142,14 +145,25 @@ class ScreenCaptureService : Service() {
 
     private var captureJob: Job? = null
     private var isActive = true
+    private var isInExecuteTime = true
+    private var Counter = 0
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun startCaptureLoopNew() {
         captureJob = SingleServiceScope.launch {
             while (isActive) {
-                captureScreenFrame()
-                intervalModifier()
-                delay(CallBack_Interval)
+                if (Counter%10 == 0) {
+                    isInExecuteTime = IsNowInTimeRangeCheck()
+                }
+                if(isInExecuteTime){
+                    captureScreenFrame()
+                    intervalModifier()
+                    delay(CallBack_Interval)
+                } else {
+                    // 不在執行時間，睡個較長時間減輕 CPU 負擔
+                    delay(6000L) // 6秒，根據需求調整
+                }
+                Counter = (Counter + 1) % 10
             }
         }
     }
@@ -204,6 +218,12 @@ class ScreenCaptureService : Service() {
             MinusValueNow = 0.1f
             RefreshCountNow = 5
         }
+        if (GlobalValueHolder.DownValue != 0f) {
+            //
+            // Override  User input
+            //
+            DownValueNow = GlobalValueHolder.DownValue
+        }
         if (IsInit) {
             CoinValueSatisfy = UpValueNow
         } else {
@@ -241,16 +261,21 @@ class ScreenCaptureService : Service() {
     private fun intervalModifier () {
         if (CoinStates == CState.WAITING_COIN) {
             CallBack_Interval = 10000L
+            if(GlobalValueHolder.IsLowEndDevice){
+                CallBack_Interval = (CallBack_Interval.toFloat() * 3.01f).toLong()
+            }
             Log.d("CallBack_Interval", " Long time ")
         } else {
-            CallBack_Interval = 4500L
+            CallBack_Interval = 4800L
+            if(GlobalValueHolder.IsLowEndDevice){
+                CallBack_Interval = (CallBack_Interval.toFloat() * 2.1f).toLong()
+            }
             Log.d("CallBack_Interval", " Short Time")
         }
+        Log.d("CallBack_Interval", "Normal Mode → Interval: $CallBack_Interval ms")
     }
 
-
     private fun StartAndCheckSkip():Boolean {
-
         if (gIsCapturing) {
             Log.d("gIsCapturing", "gIsCapturing yes")
             return true
@@ -478,23 +503,25 @@ class ScreenCaptureService : Service() {
                                     }
                                 }
 
+                                val matches3 = regex3.find(line.text)
+                                if( matches3 != null) {
+                                    Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
+                                    Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                    CoinStates = CState.GET_COIN_READY
+                                    if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                                        Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
+                                        TouchClick(Coin_Position_x, Coin_Position_y)
+                                    }
+                                    break@OuterReg
+                                }
+
                                 if (CoinStates == CState.WAITING_COIN) {
                                     //Log.d("CoinStates", "CState.WAITING_COIN")
                                     val matches2 = regex2.find(line.text)
-                                    val matches3 = regex3.find(line.text)
                                     val matches4 = regex4.find(line.text)
                                     if (matches2 != null){
                                         Log.d("RegexMatch", "找到Coin Time：${matches2.value}")
                                         Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                        break@OuterReg
-                                    } else if (matches3 != null) {
-                                        Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
-                                        Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                        CoinStates = CState.GET_COIN_READY
-                                        if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                                            Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
-                                            TouchClick(Coin_Position_x, Coin_Position_y)
-                                        }
                                         break@OuterReg
                                     } else if (matches4 != null){
                                         serviceScope.launch {
@@ -503,20 +530,33 @@ class ScreenCaptureService : Service() {
                                         CoinStates = CState.SEARCHING_COIN
                                         break@OuterReg
                                     }
-                                } else {
+                                }
+                                else {
                                     CoinStates = CState.PAGE_COIN_NOT_FIND
                                 }
                             }
                         }
+
+                        if (CoinStates == CState.GET_COIN_READY) {
+                            //
+                            // 如果 GET_COIN_READY 太多次 代表 主播跑了
+                            //
+                            GetCoinFreezeCount += 1
+                            Log.d("move", "太多次 代表 主播跑了 +1")
+                        } else {
+                            Log.d("move", "GET_COIN_READY = 0")
+                            GetCoinFreezeCount = 0
+                        }
                         if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
                             NotFindConter += 1
                         }
-                        if (NotFindConter >= 2){
+                        if (NotFindConter >= 2 || GetCoinFreezeCount > 2){
                             Log.d("move", "MoveNextPage")
                             CoinStates = CState.NOT_FIND_DOING_FRESH
                             //AddCoinList(CoinValueToRecord)
-                            FinNextRoom()
+                            FindNextRoom()
                             NotFindConter = 0
+                            GetCoinFreezeCount = 0
                         }
                         Log.d("gIsCapturing", "IsCapturing = false")
 
@@ -569,7 +609,7 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun FinNextRoom() {
+    private fun FindNextRoom() {
         MoveNextPage()
     }
 
@@ -653,6 +693,26 @@ class ScreenCaptureService : Service() {
         virtualDisplay = null
         imageReader = null
     }
+
+
+    fun IsNowInTimeRangeCheck(
+    ): Boolean {
+        val now = Calendar.getInstance()
+        val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        val startMinutes = GlobalValueHolder.StartHour * 60 + GlobalValueHolder.StartMinute
+        val endMinutes = GlobalValueHolder.EndHour * 60 + GlobalValueHolder.EndMinute
+
+        return if (!GlobalValueHolder.IsTimeLimit){
+           true // 沒有限制，永遠回傳 true
+        } else if(startMinutes <= endMinutes) {
+            // 一般區間，例如 08:00 ~ 18:00
+            nowMinutes in startMinutes..endMinutes
+        } else {
+            // 跨午夜區間，例如 22:00 ~ 06:00
+            nowMinutes >= startMinutes || nowMinutes <= endMinutes
+        }
+    }
+
 
 
     override fun onBind(intent: Intent?): IBinder? = null
