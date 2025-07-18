@@ -41,7 +41,6 @@ var CoinValueList = mutableListOf (0f)
 class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
-    //private lateinit var captureRunnable: Runnable  //每10秒 執行用
     private val handler = Handler(Looper.getMainLooper())
 
     private var virtualDisplay: VirtualDisplay? = null
@@ -64,8 +63,6 @@ class ScreenCaptureService : Service() {
     }
 
     var gIsCapturing = false
-
-    private lateinit var captureRunnable: Runnable
 
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
@@ -360,7 +357,7 @@ class ScreenCaptureService : Service() {
         bitmap.copyPixelsFromBuffer(buffer)
         return bitmap
     }
-
+    var Y_axis_shift = 0f
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleEventCase(bitmap: Bitmap) {
 
@@ -368,7 +365,10 @@ class ScreenCaptureService : Service() {
             UpdatePositionForFullFreshPage(bitmap)
         }
 
+        Y_axis_shift = bitmap.width.toFloat() / 4f
+
         val cutBitmapHalf = BitmapCropLib.cropToVerticalMiddleTwo (bitmap)
+
         //
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
@@ -401,6 +401,8 @@ class ScreenCaptureService : Service() {
                                 val matches6 = regex6.find(line.text)
                                 val matches7 = regex7.find(line.text)
 
+                                //Log.d("OCR_Line", "文字內容：${line.text}")
+                                //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
                                 if (matches1 != null) {
                                     Log.d("RegexMatch", "找到  本場直播還可領取")
                                     serviceScope.launch {
@@ -426,7 +428,7 @@ class ScreenCaptureService : Service() {
                                 }
                                 if (matches7 != null) {
                                     line.boundingBox?.let { box ->
-                                        TouchClick(box.centerX().toFloat(), box.centerY().toFloat())
+                                        TouchClick(box.centerX().toFloat(), box.centerY().toFloat() + Y_axis_shift )
                                     }
                                 }
                             }
@@ -630,7 +632,7 @@ class ScreenCaptureService : Service() {
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun FullFreshPage() {
+    private fun FullFreshPage() {
 
         if (Full_refresh_Position_x != 0f && Full_refresh_Position_y != 0f) {
             serviceScope.launch {
@@ -657,13 +659,14 @@ class ScreenCaptureService : Service() {
         QuickRefreshPage()
         delay(100L)
     }
+
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun QuickRefreshPage () {
-        delay(100L)
+        delay(30L)
         MoveNextPage()
-        delay(1200L)
+        delay(1500L)
         MovePreviousPage ()
-        delay(100L)
+        delay(50L)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -703,12 +706,10 @@ class ScreenCaptureService : Service() {
     private fun cleanup() {
         virtualDisplay?.release()
         imageReader?.close()
-        handler.removeCallbacks(captureRunnable)
         mediaProjection = null
         virtualDisplay = null
         imageReader = null
     }
-
 
     fun IsNowInTimeRangeCheck(
     ): Boolean {
