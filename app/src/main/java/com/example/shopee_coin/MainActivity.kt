@@ -4,6 +4,7 @@ package com.example.shopee_coin
 
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
@@ -14,6 +15,7 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -83,6 +85,10 @@ class MainActivity : ComponentActivity() {
         //
         // 懸浮視窗的權限 End
         //
+
+        if (!isAccessibilityServiceEnabled(MyAccessibilityService::class.java)) {
+            Toast.makeText(this, "⚠️ 請開啟無障礙服務以啟用自動操作", Toast.LENGTH_LONG).show()
+        }
 
         // MediaProjection 的權限 in 另一個 activity
         //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
@@ -154,8 +160,7 @@ class MainActivity : ComponentActivity() {
                 Text("按此開始 蝦幣 偵測")
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text("tips: 開始 蝦幣偵測後 懸浮按鈕 打開到ON 才能做動")
-
+            Text("tips: 按蝦幣偵測後 \"懸浮按鈕\"開到ON 才會做動 請開無障礙服務")
             Row(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -242,10 +247,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun isAccessibilityServiceEnabled(serviceClass: Class<*>): Boolean {
+        val expectedComponentName = ComponentName(this, serviceClass)
+        val enabledServicesSetting = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+
+        val colonSplitter = TextUtils.SimpleStringSplitter(':')
+        colonSplitter.setString(enabledServicesSetting)
+        for (service in colonSplitter) {
+            if (ComponentName.unflattenFromString(service) == expectedComponentName) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun StartShopeeCoinService(mainActivity: MainActivity) {
         // 由此開始 錄製
         // MediaProjection 的權限 in 另一個 activity
-        startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
+        //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
+        val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        startActivity(intent)
     }
 
     //
