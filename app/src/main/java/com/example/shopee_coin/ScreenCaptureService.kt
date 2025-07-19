@@ -170,7 +170,6 @@ class ScreenCaptureService : Service() {
         captureJob = null
     }
 
-
     fun findCurrentStrategy(hour: Int, mins: Int, strategies: List<CoinStrategy>): CoinStrategy? {
         val nowTotalMinutes = hour * 60 + mins
 
@@ -217,7 +216,7 @@ class ScreenCaptureService : Service() {
         }
         if (GlobalValueHolder.DownValue != 0f) {
             //
-            // Override  User input
+            // Override by User input
             //
             DownValueNow = GlobalValueHolder.DownValue
         }
@@ -312,7 +311,6 @@ class ScreenCaptureService : Service() {
         Log.d("captureScreenFrame", "GO")
         gIsCapturing = true
 
-
         Log.d("acquireLatestImage", "acquireLatestImage Start")
         val image = imageReader?.acquireLatestImage()
         if (image == null) {
@@ -325,14 +323,6 @@ class ScreenCaptureService : Service() {
         if (CoinStates == CState.NOT_FIND_DOING_FRESH){
             delay(500L)
         }
-/*
-        val planes = image.planes
-        val buffer = planes[0].buffer
-        val pixelStride = planes[0].pixelStride
-        val rowStride = planes[0].rowStride
-        val rowPadding = rowStride - pixelStride * width
-        val bitmap = createBitmap(image.width + rowPadding / pixelStride, image.height, Bitmap.Config.ARGB_8888)
-        bitmap.copyPixelsFromBuffer(buffer)*/
 
         val bitmap = GetBitmapFromImage(image)
         HandleEventCase (bitmap)
@@ -711,8 +701,7 @@ class ScreenCaptureService : Service() {
         imageReader = null
     }
 
-    fun IsNowInTimeRangeCheck(
-    ): Boolean {
+    private fun IsNowInTimeRangeCheck(): Boolean {
         val now = Calendar.getInstance()
         val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
         val startMinutes = GlobalValueHolder.StartHour * 60 + GlobalValueHolder.StartMinute

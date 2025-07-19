@@ -16,13 +16,12 @@ class ScreenCapturePermissionActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("shot", "onCreate ScreenCapturePermissionActivity11111111111111111111111111111111111111111")
-
+        Log.d("shot", "onCreate ScreenCapturePermissionActivity")
 
         mediaProjectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val intent = mediaProjectionManager.createScreenCaptureIntent()
 
-        Log.d("shot", "onCreate ScreenCapturePermissionActivity1333333333333333333333333333333333")
+        Log.d("shot", "onCreate ScreenCapturePermissionActivity")
 
         startActivityForResult(intent, 1001)
 
