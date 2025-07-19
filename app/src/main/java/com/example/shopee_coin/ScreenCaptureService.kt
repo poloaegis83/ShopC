@@ -59,7 +59,7 @@ class ScreenCaptureService : Service() {
     var CoinStates = CState.COIN_START
 
     enum class CState {
-        COIN_START ,GET_COIN_READY, WAITING_COIN, SEARCHING_COIN, PAGE_COIN_NOT_FIND, NOT_FIND_DOING_FRESH, FEATURE_CLOSE
+        COIN_START ,GET_COIN_READY, WAITING_COIN, SEARCHING_COIN, PAGE_COIN_NOT_FIND, NOT_FIND_DOING_FRESH, WAITING_COIN_BUT_NOT_FIND_TIME
     }
 
     var gIsCapturing = false
@@ -368,6 +368,8 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     suspend fun processEventCaseImage(image: Bitmap) {
         return suspendCoroutine { cont ->
+
+            val regex8 = Regex("加活動")
             val regex7 = Regex("^再試一次")
             val regex6 = Regex("網路連線")
             val regex5 = Regex("寵粉紅包雨")
@@ -390,8 +392,9 @@ class ScreenCaptureService : Service() {
                                 val matches5 = regex5.find(line.text)
                                 val matches6 = regex6.find(line.text)
                                 val matches7 = regex7.find(line.text)
+                                val matches8 = regex8.find(line.text)
 
-                                //Log.d("OCR_Line", "文字內容：${line.text}")
+                                Log.d("OCR_Line", "文字內容：${line.text}")
                                 //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
                                 if (matches1 != null) {
                                     Log.d("RegexMatch", "找到  本場直播還可領取")
@@ -399,9 +402,10 @@ class ScreenCaptureService : Service() {
                                         GetCoinAndQuickRefreshPage()
                                     }
                                 }
-                                if (matches2 != null || matches3 != null || matches4 != null) {
-                                    Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包")
+                                if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
+                                    Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
                                     PlatformBackGesture()
+
                                 }
                                 if (matches5 != null) {
                                     CoroutineScope(Dispatchers.Main).launch {
@@ -441,7 +445,10 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleCoinCase(bitmap: Bitmap) {
 
-        val cutBitmap = BitmapCropLib.cropToTopRightQuarter (bitmap)
+        //val cutBitmap = BitmapCropLib.cropToTopRightQuarter (bitmap)
+        var cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
+
+        cutBitmap = BitmapCropLib.upscaleBitmap(cutBitmap, 4)
 
         processCoinCaseImage(cutBitmap)
     }
@@ -450,7 +457,7 @@ class ScreenCaptureService : Service() {
     suspend fun processCoinCaseImage(image: Bitmap) {
         return suspendCoroutine { cont ->
 
-            val regex1 = Regex("(^\\d\$)|(\\d\\.\\d{1,2})")
+            val regex1 = Regex("(\\d\$)|(\\d\\.\\d{1,2})")
             val regex2 = Regex("(10\\:00)|((0[0-9])(\\:\\d{0,2}))")
             val regex3 = Regex("領取")
             val regex4 = Regex("重試")
@@ -459,7 +466,7 @@ class ScreenCaptureService : Service() {
             var Coin_Position_y  = 0f
 
             var CoinValueToRecord = 0f
-
+            var FindCoinButNoTime = 0
             CoinStates = CState.SEARCHING_COIN
 
             TextRecognizerUtil.recognizeTextFromImage(
@@ -487,7 +494,7 @@ class ScreenCaptureService : Service() {
                                         if (boxc != null) {
                                             Coin_Position_x = (boxc.centerX()).toFloat()
                                             Coin_Position_y = (boxc.centerY()).toFloat()
-                                            Coin_Position_x += metrics.widthPixels / 2f   // X 只有1/2 必須加位置
+                                            Coin_Position_x += metrics.widthPixels / 2f + metrics.widthPixels / 4f   // X 只有 1/2 + 1/4 必須加位置
                                             Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
                                         }
                                     }
@@ -512,13 +519,25 @@ class ScreenCaptureService : Service() {
                                     if (matches2 != null){
                                         Log.d("RegexMatch", "找到Coin Time：${matches2.value}")
                                         Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                        FindCoinButNoTime = 0
                                         break@OuterReg
-                                    } else if (matches4 != null){
+                                    }
+                                    if (matches4 != null) {
                                         serviceScope.launch {
                                             QuickRefreshPage()
                                         }
+                                        FindCoinButNoTime = 0
                                         CoinStates = CState.SEARCHING_COIN
                                         break@OuterReg
+                                    }
+                                    //
+                                    // 找到coin 但沒時間 Fix with QuickRefreshPage
+                                    //
+                                    FindCoinButNoTime += 1
+                                    if (FindCoinButNoTime > 3){
+                                        serviceScope.launch {
+                                            QuickRefreshPage()
+                                        }
                                     }
                                 } else {
                                     CoinStates = CState.PAGE_COIN_NOT_FIND
