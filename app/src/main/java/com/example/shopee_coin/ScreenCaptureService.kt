@@ -417,6 +417,7 @@ class ScreenCaptureService : Service() {
                                     }
                                 }
                                 if (matches6 != null) {
+                                    Log.d("move", "網路連線 with QuickRefreshPage")
                                     serviceScope.launch {
                                         QuickRefreshPage()
                                     }
@@ -446,7 +447,8 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleCoinCase(bitmap: Bitmap) {
 
-        val cutBitmap = BitmapCropLib.cropToTopRightQuarter (bitmap)
+        //val cutBitmap = BitmapCropLib.cropToTopRightQuarter (bitmap)
+        val cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
         //val cutBitmap = BitmapCropLib.cropFinalRegion (bitmap)
         //cutBitmap = BitmapCropLib.cropToVerticalMiddleTwo(cutBitmap)
         //cutBitmap = BitmapCropLib.toGrayscale(cutBitmap)
@@ -472,9 +474,9 @@ class ScreenCaptureService : Service() {
 
             val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
             val regex2 = Regex("(10\\:00)|((0[0-9])(\\:\\d{0,2}))")
-            val regex3 = Regex("領取")
-            val regex4 = Regex("重試")
-            val regex5 = Regex("已結束")
+            val regex3 = Regex("^領取")
+            val regex4 = Regex("^重試")
+            //val regex5 = Regex("已結束")
 
             var Coin_Position_x  = 0f
             var Coin_Position_y  = 0f
@@ -506,8 +508,8 @@ class ScreenCaptureService : Service() {
                                         //Coin_Position_y = (boxc.centerY()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
                                         Coin_Position_x = (boxc.centerX()).toFloat()
                                         Coin_Position_y = (boxc.centerY()).toFloat()
-                                        //Coin_Position_x += (metrics.widthPixels / 2f)+ (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
-                                        Coin_Position_x += (metrics.widthPixels / 2f)
+                                        Coin_Position_x += (metrics.widthPixels / 2f)+ (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
+                                        //Coin_Position_x += (metrics.widthPixels / 2f)
                                         //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
                                         Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
                                     }
@@ -518,24 +520,32 @@ class ScreenCaptureService : Service() {
                                     }
                                 }
 
-                                val matches5 = regex5.find(line.text)
-                                if (matches5 != null) {
-                                    Log.d("RegexMatch", "已結束")
-                                    serviceScope.launch {
-                                        MoveNextPage()
-                                    }
-                                }
+                               // val matches5 = regex5.find(line.text)
+                               // if (matches5 != null) {
+                               //     Log.d("RegexMatch", "已結束")
+                               //     serviceScope.launch {
+                               //         MoveNextPage()
+                               //     }
+                               // }
 
                                 val matches3 = regex3.find(line.text)
                                 if( matches3 != null) {
-                                    Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
-                                    Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                    CoinStates = CState.GET_COIN_READY
-                                    if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                                        Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
-                                        TouchClick(Coin_Position_x, Coin_Position_y)
+                                    val boxg = line.boundingBox
+                                    if (boxg != null) {
+                                        if (boxg.centerY() >= Coin_Position_y) {  //check Get Coin Low Than Value  確保領取是比 coin 數字低
+                                            Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
+                                            Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                            CoinStates = CState.GET_COIN_READY
+                                            if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                                                Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
+                                                TouchClick(Coin_Position_x, Coin_Position_y)
+                                            }
+                                            break@OuterReg
+                                        } else {
+                                            Log.d("RegexMatch", "找到Coin 領取：${matches3.value}  但沒有比較低")
+                                        }
                                     }
-                                    break@OuterReg
+
                                 }
 
                                 val matches2 = regex2.find(line.text)
@@ -547,8 +557,9 @@ class ScreenCaptureService : Service() {
                                         FindCoinButNoTime = 0
                                         break@OuterReg
                                     }
-                                    val matches4 = regex4.find(line.text)
+                                    val matches4 = regex4.find(line.text) //重試
                                     if (matches4 != null) {
+                                        Log.d("move", "重試 with QuickRefreshPage")
                                         serviceScope.launch {
                                             QuickRefreshPage()
                                         }
@@ -561,6 +572,7 @@ class ScreenCaptureService : Service() {
                                     //
                                     FindCoinButNoTime += 1
                                     if (FindCoinButNoTime > 3){
+                                        Log.d("move", "找到coin 但沒時間 Fix with QuickRefreshPage")
                                         serviceScope.launch {
                                             QuickRefreshPage()
                                         }
@@ -631,6 +643,7 @@ class ScreenCaptureService : Service() {
         }
 
         if (GetCoinFreezeCount >= 2){
+            Log.d("move", "GetCoinFreezeCount >= 2")
             serviceScope.launch {
                 QuickRefreshPage()
             }
