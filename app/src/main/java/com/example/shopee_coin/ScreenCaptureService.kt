@@ -457,6 +457,15 @@ class ScreenCaptureService : Service() {
         processCoinCaseImage(cutBitmap)
     }
 
+    private fun last_notZero( Value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
+    {
+        return if (Value.lastOrNull() == '0'){
+            false
+        }else {
+            true
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.N)
     suspend fun processCoinCaseImage(image: Bitmap) {
         return suspendCoroutine { cont ->
@@ -465,6 +474,7 @@ class ScreenCaptureService : Service() {
             val regex2 = Regex("(10\\:00)|((0[0-9])(\\:\\d{0,2}))")
             val regex3 = Regex("領取")
             val regex4 = Regex("重試")
+            val regex5 = Regex("已結束")
 
             var Coin_Position_x  = 0f
             var Coin_Position_y  = 0f
@@ -484,12 +494,12 @@ class ScreenCaptureService : Service() {
                                 Log.d("OCR_Line", "文字內容：${line.text}")
                                 //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
                                 val matches1 = regex1.find(line.text)
-                                if (matches1 != null){
+                                if (matches1 != null  && last_notZero(matches1.value)) {
                                     Log.d("RegexMatch", "找到Coin：${matches1.value}")
                                     Log.d("OCR_Line", "位置：${line.boundingBox}")
                                     val CoinValue = matches1.value.toFloat()
                                     Log.d("CoinValue", "CoinValue：${CoinValue}")
-                                    CoinValueShows = 1
+                                    //CoinValueShows = 1
                                     val boxc = line.boundingBox
                                     if (boxc != null) {
                                         //Coin_Position_x = (boxc.centerX()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
@@ -505,6 +515,14 @@ class ScreenCaptureService : Service() {
                                     if (CoinValue >= CoinValueSatisfy ){
                                         CoinStates = CState.WAITING_COIN
                                         NotFindConter = 0
+                                    }
+                                }
+
+                                val matches5 = regex5.find(line.text)
+                                if (matches5 != null) {
+                                    Log.d("RegexMatch", "已結束")
+                                    serviceScope.launch {
+                                        MoveNextPage()
                                     }
                                 }
 
@@ -551,13 +569,13 @@ class ScreenCaptureService : Service() {
                                     //
                                     // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
                                     //
-                                    if (matches2 != null){
-                                        if (CoinValueShows == 0) {
-                                            CoinStates = CState.WAITING_COIN
-                                            Log.d("RegexMatchWA", "RegexMatch WA 找到時間 但沒有 coin value")
-                                        }
-                                        break@OuterReg
-                                    }
+                                    //if (matches2 != null){
+                                    //   if (CoinValueShows == 0) {
+                                    //        CoinStates = CState.WAITING_COIN
+                                   //         Log.d("RegexMatchWA", "RegexMatch WA 找到時間 但沒有 coin value")
+                                   //     }
+                                   //     break@OuterReg
+                                    //}
                                     //
                                     // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
                                     //
