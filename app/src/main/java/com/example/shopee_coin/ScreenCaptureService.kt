@@ -377,7 +377,7 @@ class ScreenCaptureService : Service() {
             val regex4 = Regex("未獲得")
             val regex3 = Regex("獎勵派發")
             val regex2 = Regex("未獲得寵粉")
-            val regex1 = Regex("本場直播還可領取")
+            val regex1 = Regex("直播還可領取")
 
             TextRecognizerUtil.recognizeTextFromImage(
                 bitmap = image,
@@ -406,7 +406,6 @@ class ScreenCaptureService : Service() {
                                 if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
                                     Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
                                     PlatformBackGesture()
-
                                 }
                                 if (matches5 != null) {
                                     CoroutineScope(Dispatchers.Main).launch {
