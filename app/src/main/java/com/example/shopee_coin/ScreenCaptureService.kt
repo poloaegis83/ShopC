@@ -31,6 +31,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -47,6 +49,7 @@ class ScreenCaptureService : Service() {
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var lastCaptureTime = 0L
+    val MoveActionMutex = Mutex()
 
     var CallBack_Interval = 5000L
     var NotFindConter = 0
@@ -325,12 +328,18 @@ class ScreenCaptureService : Service() {
             delay(500L)
         }
 
-        val bitmap = GetBitmapFromImage(image)
-        HandleEventCase (bitmap)
-        HandleCoinCase (bitmap)
+        var bitmap: Bitmap? = null
+        try {
+            bitmap = GetBitmapFromImage(image)
+            HandleEventCase(bitmap)
+            HandleCoinCase(bitmap)
+        } catch (e: Exception) {
+            Log.e("processImage", "Error: ${e.message}")
+        } finally {
+            bitmap?.recycle()  // 安全回收
+            image.close()      // 永遠記得關掉 Image buffer
+        }
 
-        bitmap.recycle()
-        image.close()
         gIsCapturing = false
     }
 
@@ -400,7 +409,9 @@ class ScreenCaptureService : Service() {
                                 if (matches1 != null) {
                                     Log.d("RegexMatch", "找到  本場直播還可領取")
                                     serviceScope.launch {
-                                        GetCoinAndQuickRefreshPage()
+                                        MoveActionMutex.withLock {
+                                            GetCoinAndQuickRefreshPage()
+                                        }
                                     }
                                 }
                                 if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
@@ -418,7 +429,9 @@ class ScreenCaptureService : Service() {
                                 if (matches6 != null) {
                                     Log.d("move", "網路連線 with QuickRefreshPage")
                                     serviceScope.launch {
-                                        QuickRefreshPage()
+                                        MoveActionMutex.withLock {
+                                            QuickRefreshPage()
+                                        }
                                     }
                                 }
                                 if (matches7 != null) {
@@ -560,7 +573,9 @@ class ScreenCaptureService : Service() {
                                     if (matches4 != null) {
                                         Log.d("move", "重試 with QuickRefreshPage")
                                         serviceScope.launch {
-                                            QuickRefreshPage()
+                                            MoveActionMutex.withLock {
+                                                QuickRefreshPage()
+                                            }
                                         }
                                         FindCoinButNoTime = 0
                                         CoinStates = CState.SEARCHING_COIN
@@ -573,7 +588,9 @@ class ScreenCaptureService : Service() {
                                     if (FindCoinButNoTime > 3){
                                         Log.d("move", "找到coin 但沒時間 Fix with QuickRefreshPage")
                                         serviceScope.launch {
-                                            QuickRefreshPage()
+                                            MoveActionMutex.withLock {
+                                                QuickRefreshPage()
+                                            }
                                         }
                                     }
                                 } else {
@@ -644,7 +661,9 @@ class ScreenCaptureService : Service() {
         if (GetCoinFreezeCount >= 2){
             Log.d("move", "GetCoinFreezeCount >= 2")
             serviceScope.launch {
-                QuickRefreshPage()
+                MoveActionMutex.withLock {
+                    QuickRefreshPage()
+                }
             }
             GetCoinFreezeCount = 0
         }
