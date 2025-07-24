@@ -365,7 +365,7 @@ class ScreenCaptureService : Service() {
             UpdatePositionForFullFreshPage(bitmap)
         }
 
-        Y_axis_shift = bitmap.width.toFloat() / 4f
+        Y_axis_shift = bitmap.height.toFloat() / 4f
 
         val cutBitmapHalf = BitmapCropLib.cropToVerticalMiddleTwo (bitmap)
 
@@ -382,7 +382,7 @@ class ScreenCaptureService : Service() {
             val regex8 = Regex("加活動")
             val regex7 = Regex("^再試一次")
             val regex6 = Regex("網路連線")
-            val regex5 = Regex("寵粉紅包雨")
+            val regex5 = Regex("手速搶紅包")
             val regex4 = Regex("未獲得")
             val regex3 = Regex("獎勵派發")
             val regex2 = Regex("未獲得寵粉")
@@ -436,7 +436,7 @@ class ScreenCaptureService : Service() {
                                 }
                                 if (matches7 != null) {
                                     line.boundingBox?.let { box ->
-                                        TouchClick(box.centerX().toFloat(), box.centerY().toFloat() + Y_axis_shift )
+                                        TouchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
                                     }
                                 }
                             }
