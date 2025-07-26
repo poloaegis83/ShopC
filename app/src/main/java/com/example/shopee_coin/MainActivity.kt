@@ -5,7 +5,9 @@ package com.example.shopee_coin
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.hardware.display.VirtualDisplay
@@ -13,10 +15,14 @@ import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
+import android.util.DisplayMetrics
 import android.util.Log
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,6 +52,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.window.layout.WindowMetricsCalculator
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
 import java.util.Calendar
 
@@ -92,6 +99,18 @@ class MainActivity : ComponentActivity() {
 
         // MediaProjection 的權限 in 另一個 activity
         //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
+
+        val (realHeight, availableHeight) = getScreenHeights(this)
+        Log.d("ScreenHeight", "實體高度: $realHeight, 可用高度: $availableHeight")
+
+        val NavigationBarHeight =  getNavigationBarHeight(this)
+        Log.d("NavigationBarHeight", "NavigationBarHeight: $NavigationBarHeight")
+
+        if (NavigationBarHeight == 0) {
+            gHeightOffset = (realHeight - availableHeight).toFloat()
+        } else {
+            gHeightOffset = (realHeight - NavigationBarHeight - availableHeight).toFloat()
+        }
 
         enableEdgeToEdge()
 
@@ -244,6 +263,51 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+        }
+    }
+
+
+    @SuppressLint("ServiceCast")
+    fun getScreenHeights(context: Context): Pair<Int, Int> {
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // API 30+
+            val metrics = WindowMetricsCalculator.getOrCreate().computeCurrentWindowMetrics(context)
+            val bounds = metrics.bounds
+            val realHeight = bounds.height()
+
+            val availableHeight = Resources.getSystem().displayMetrics.heightPixels
+
+            Pair(realHeight, availableHeight)
+        } else {
+            // API < 30
+            val display = windowManager.defaultDisplay
+            val realMetrics = DisplayMetrics()
+            display.getRealMetrics(realMetrics)
+            val realHeight = realMetrics.heightPixels
+
+            val availableMetrics = DisplayMetrics()
+            display.getMetrics(availableMetrics)
+            val availableHeight = availableMetrics.heightPixels
+
+            Pair(realHeight, availableHeight)
+        }
+    }
+
+    fun getNavigationBarHeight(context: Context): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // API 30 以上用 WindowInsets
+            val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = windowManager.currentWindowMetrics
+            val insets = metrics.windowInsets
+                .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+
+            insets.bottom
+        } else {
+            // API 29 以下從資源中抓 navigation_bar_height
+            val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+            if (resourceId > 0) context.resources.getDimensionPixelSize(resourceId) else 0
         }
     }
 

@@ -17,6 +17,9 @@ object GlobalValueHolder {
     var IsTimeLimit: Boolean = false
 }
 
+var gHeightOffset: Float = 0.0f
+
+
 data class CoinStrategy(
     val Start_Hour: Int,
     val Start_Mins: Int,
