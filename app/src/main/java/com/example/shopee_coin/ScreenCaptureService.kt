@@ -812,7 +812,7 @@ class ScreenCaptureService : Service() {
     private suspend fun QuickRefreshPage () {
         delay(30L)
         MoveNextPage()
-        delay(1500L)
+        delay(1600L)
         MovePreviousPage ()
         delay(50L)
     }

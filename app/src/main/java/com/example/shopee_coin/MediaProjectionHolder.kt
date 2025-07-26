@@ -11,9 +11,9 @@ object GlobalValueHolder {
     var DownValue: Float = 0f
     var IsLowEndDevice: Boolean = false
     var StartHour: Int = 8
-    var StartMinute: Int = 0
-    var EndHour: Int = 22
-    var EndMinute: Int = 0
+    var StartMinute: Int = 30
+    var EndHour: Int = 23
+    var EndMinute: Int = 30
     var IsTimeLimit: Boolean = false
 }
 
@@ -41,5 +41,5 @@ val DefaultStrategies = listOf(
     //傍晚
     CoinStrategy(17, 40, 19, 30, 0.3f, 0.2f, 0.05f,5),
     //晚上
-    CoinStrategy(19, 30, 22, 30, 0.4f, 0.3f, 0.1f,5),
+    CoinStrategy(19, 30, 23, 0, 0.4f, 0.3f, 0.1f,5),
 )
