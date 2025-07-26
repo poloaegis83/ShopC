@@ -740,21 +740,25 @@ class ScreenCaptureService : Service() {
         Full_refresh_Position_y = 0f
         val cut_image = BitmapCropLib.cropToVerticalTopQuarter(snap_image)
 
-        val regex = Regex("直播")
+        val regex = Regex("短.{1}音.*?直.{1}")
+
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
             context = this, // activity context
             onResult = { resultText ->
                 OutHere@ for (block in resultText.textBlocks) {
                     for (line in block.lines) {
+                        Log.d("OCR_Line Full", "文字內容：${line.text}")
+                        //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
                         val matches = regex.find(line.text)
                         if (matches != null) {
-                            Log.d("RegexMatch直播", "找到 直播：${matches.value}")
+                            Log.d("RegexMatch直播 Full", "找到 短影音 直播 推薦：${matches.value}")
                             Log.d("OCR_Line", "位置：${line.boundingBox}")
                             val boxc = line.boundingBox
                             if (boxc != null) {
-                                Full_refresh_Position_x = (boxc.centerX()).toFloat()
+                                Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/8.5f  // hard code, metrics.widthPixels / 2f
                                 Full_refresh_Position_y = (boxc.centerY()).toFloat()
+                                Log.d("RegexMatch直播", "Full_refresh_Position_x：${Full_refresh_Position_x}, Full_refresh_Position_y：${Full_refresh_Position_y}, w: ${boxc.width()}")
                                 break@OutHere
                             }
                         }
@@ -817,16 +821,18 @@ class ScreenCaptureService : Service() {
     private fun MovePreviousPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 3f
-        TouchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 700)
+        val MoveDistance  = metrics.heightPixels / 2.5f
+        Log.d("MovePreviousPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
+        TouchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 900)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun MoveNextPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 3f
-        TouchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, 700)
+        val MoveDistance  = metrics.heightPixels / 2.5f
+        Log.d("MoveNextPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
+        TouchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, 900)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
