@@ -260,7 +260,6 @@ class ScreenCaptureService : Service() {
         }
     }
 
-
     private fun intervalModifier () {
         if (CoinStates == CState.WAITING_COIN) {
             CallBack_Interval = 10000L
@@ -285,12 +284,6 @@ class ScreenCaptureService : Service() {
         } else {
             Log.d("gIsCapturing", "gIsCapturing no")
         }
-
-        /*if (CoinStates == CState.WAITING_COIN) {
-            if (!CheckTime_interval_OK()){
-                return true
-            }
-        }*/
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         val isOn = prefs.getBoolean("OCR_ENABLED", false)
@@ -512,13 +505,6 @@ class ScreenCaptureService : Service() {
             var Coin_Position_y  = 0f
             var Coin_Position_Height  = 0f
 
-            var Coin_timeX_Axis = 0f
-            var Coin_timeY_Axis_Top = 0f
-            var Coin_timeY_Axis_Button = 0f
-
-            var CoinValueShows = 0
-            var CoinValueToRecord = 0f
-
             CoinStates = CState.SEARCHING_COIN
 
             TextRecognizerUtil.recognizeTextFromImage(
@@ -544,7 +530,6 @@ class ScreenCaptureService : Service() {
                                         //Coin_Position_x = (boxc.centerX()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
                                         //Coin_Position_y = (boxc.centerY()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
                                         Coin_Position_x = (boxc.centerX()).toFloat()
-                                        Coin_timeX_Axis = Coin_Position_x
                                         Coin_Position_y = realY ((boxc.centerY()).toFloat(),2)
                                         Coin_Position_Height = boxc.height().toFloat()
                                         Log.d("CoinValue", "boxc.bottom：${boxc.bottom} , boxc.top：${boxc.top}, boxc.centerY() ${boxc.centerY()} ,  height: = ${boxc.height()}")
@@ -556,7 +541,7 @@ class ScreenCaptureService : Service() {
 
                                         //CoinStates = CState.COIN_VAULE_FIND
                                     }
-                                    CoinValueToRecord = CoinValue
+
                                     if (CoinValue >= CoinValueSatisfy ){
                                         Log.d("CoinValue p", "Coin COIN_VAULE_FIND  滿足")
                                         CoinStates = CState.COIN_VAULE_FIND
@@ -589,12 +574,11 @@ class ScreenCaptureService : Service() {
                                             Log.d("RegexMatch", "找到Coin 領取：${matches3.value}  但沒有比較低")
                                         }
                                     }
-
                                 }
+
                                 if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
                                    val matches2 = regex2.find(line.text)
                                      if (matches2 != null) {
-
                                         Log.d("OCR_Line", "Coin T位置：${line.boundingBox}")
                                         val boxt = line.boundingBox
                                         if ( boxt != null){
@@ -657,22 +641,11 @@ class ScreenCaptureService : Service() {
                             }
                         }
 
-
                         //
                         // 找到coin 但沒時間 Fix with QuickRefreshPage
                         //
-                        if (Coin_Position_x != 0f && Coin_Position_y != 0f){
-                            gFindCoinButNoTime += 1
-                            Log.d("move", "FindCoinButNoTime  ===  $gFindCoinButNoTime")
-                            if (gFindCoinButNoTime > 3){
-                                Log.d("move", "找到coin 但沒時間 Fix with QuickRefreshPage")
-                                gFindCoinButNoTime = 0
-                                serviceScope.launch {
-                                    MoveActionMutex.withLock {
-                                        QuickRefreshPage()
-                                    }
-                                }
-                            }
+                        if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                            FindCoinButNoTimeHandler()
                         }
 
                         GetCoinFreezeHandler()
@@ -730,7 +703,22 @@ class ScreenCaptureService : Service() {
             }
             GetCoinFreezeCount = 0
         }
+    }
 
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun FindCoinButNoTimeHandler() {
+        gFindCoinButNoTime += 1 // always +1 如果找到 time code 會清 0
+        Log.d("move", "FindCoinButNoTime  ===  $gFindCoinButNoTime")
+        if (gFindCoinButNoTime > 3){
+            Log.d("move", "找到coin 但沒時間 Fix with QuickRefreshPage")
+            gFindCoinButNoTime = 0
+            serviceScope.launch {
+                MoveActionMutex.withLock {
+                    QuickRefreshPage()
+                }
+            }
+        }
     }
 
 
