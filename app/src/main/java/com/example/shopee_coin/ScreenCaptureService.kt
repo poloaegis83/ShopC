@@ -377,13 +377,13 @@ class ScreenCaptureService : Service() {
         return suspendCoroutine { cont ->
 
             val regex8 = Regex("加活動")
-            val regex7 = Regex("^再試一次")
-            val regex6 = Regex("網路連線")
+            val regex7 = Regex("^再[試式]一次")
+            val regex6 = Regex("[網罔]路[連蓮]線")
             val regex5 = Regex("手速搶紅包")
-            val regex4 = Regex("未獲得")
-            val regex3 = Regex("獎勵派發")
-            val regex2 = Regex("未獲得寵粉")
-            val regex1 = Regex("直播還可領取")
+            val regex4 = Regex("[禾未千末朱]獲得")
+            val regex3 = Regex("[獎賞][勵歷]派[發髮]")
+            val regex2 = Regex("[禾未千末朱]獲得寵粉")
+            val regex1 = Regex("[直置][播波]還可領取")
 
             TextRecognizerUtil.recognizeTextFromImage(
                 bitmap = image,
@@ -496,7 +496,7 @@ class ScreenCaptureService : Service() {
         return suspendCoroutine { cont ->
 
             val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
-            val regex2 = Regex("(10\\:00)|((0[0-9])(\\:\\d{0,2}))")
+            val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
             val regex3 = Regex("^領取")
             val regex4 = Regex("^重試")
             //val regex5 = Regex("已結束")

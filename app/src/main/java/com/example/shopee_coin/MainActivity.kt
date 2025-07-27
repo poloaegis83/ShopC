@@ -2,6 +2,7 @@ package com.example.shopee_coin
 
 // 新增 import
 
+import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
 import android.content.ComponentName
@@ -14,11 +15,9 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowInsets
@@ -38,20 +37,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.window.layout.WindowMetricsCalculator
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
 import java.util.Calendar
@@ -82,7 +90,7 @@ class MainActivity : ComponentActivity() {
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
+                "package:$packageName".toUri()
             )
             overlayPermissionLauncher.launch(intent)
             return
@@ -93,9 +101,9 @@ class MainActivity : ComponentActivity() {
         // 懸浮視窗的權限 End
         //
 
-        if (!isAccessibilityServiceEnabled(MyAccessibilityService::class.java)) {
-            Toast.makeText(this, "⚠️ 請開啟無障礙服務以啟用自動操作", Toast.LENGTH_LONG).show()
-        }
+        //if (!isAccessibilityServiceEnabled(MyAccessibilityService::class.java)) {
+        //    Toast.makeText(this, "⚠️ 請開啟無障礙服務以啟用自動操作", Toast.LENGTH_LONG).show()
+        //}
 
         // MediaProjection 的權限 in 另一個 activity
         //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
@@ -117,13 +125,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Shopee_coinTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(modifier = Modifier.fillMaxSize(),
+                        //containerColor = Color.White  // 白底
+                ) { innerPadding ->
                     // **新增開始**
 
                     Column(modifier = Modifier.padding(innerPadding)) {
                         Greeting(
-                            name = "蝦幣工具",
+                            name = "蝦霸-蝦幣工具",
                             modifier = Modifier
+                            .scale(0.8f)
                         )
 
                     }
@@ -153,7 +164,9 @@ class MainActivity : ComponentActivity() {
         var text1 by remember { mutableStateOf("") }
         var text2 by remember { mutableStateOf("") }
 
-        Column(modifier = Modifier.padding(top = 50.dp, start = 20.dp)) {
+        Column(modifier = Modifier.padding(top = 50.dp, start = 1.dp)
+            .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
+        ) {
 
             TextField(
                 value = text2,
@@ -162,9 +175,9 @@ class MainActivity : ComponentActivity() {
                 singleLine = true,
                 modifier = Modifier.width(componentWidth)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text("底線值：$text2")
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Button(
                 onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f ) },
                 modifier = Modifier.width(componentWidth)
@@ -189,7 +202,11 @@ class MainActivity : ComponentActivity() {
                     onCheckedChange = { checked ->
                         isLowEndDevice = checked
                         GlobalValueHolder.IsLowEndDevice = checked
-                    }
+                    },
+                    //colors = CheckboxDefaults.colors(
+                    //    checkedColor = Color.Black,
+                    //    uncheckedColor = Color.Black
+                    //)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = "Low-End Device(低階裝置用，反應變慢)")
@@ -240,7 +257,11 @@ class MainActivity : ComponentActivity() {
                     onCheckedChange = { checked ->
                         isTimeLimit = checked
                         GlobalValueHolder.IsTimeLimit = checked
-                    }
+                    },
+                    //colors = CheckboxDefaults.colors(
+                    //    checkedColor = Color.Black,
+                    //    uncheckedColor = Color.Black
+                    //)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = "啟用 時段內偵測")
@@ -263,9 +284,38 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+             AccessibilityStatusScreen()
+
         }
     }
 
+    @Composable
+    fun AccessibilityStatusScreen(context: Context = LocalContext.current) {
+        var text3 by remember { mutableStateOf("檢查中...") }
+
+        val lifecycleOwner = LocalLifecycleOwner.current
+
+        // 每次進入前景會重新檢查
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    val isEnabled = context.isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
+                    text3 = if (isEnabled) " 無障礙服務已啟用✅ " else " 無障礙服務未啟用❌ 請手動打開"
+                }
+            }
+
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
+        Text(
+            text = text3,
+            modifier = Modifier.padding(top = 12.dp),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
+        )
+    }
 
     @SuppressLint("ServiceCast")
     fun getScreenHeights(context: Context): Pair<Int, Int> {
@@ -311,21 +361,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun isAccessibilityServiceEnabled(serviceClass: Class<*>): Boolean {
-        val expectedComponentName = ComponentName(this, serviceClass)
-        val enabledServicesSetting = Settings.Secure.getString(
-            contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val colonSplitter = TextUtils.SimpleStringSplitter(':')
-        colonSplitter.setString(enabledServicesSetting)
-        for (service in colonSplitter) {
-            if (ComponentName.unflattenFromString(service) == expectedComponentName) {
-                return true
-            }
-        }
-        return false
+    fun Context.isAccessibilityServiceEnabled(serviceClass: Class<out AccessibilityService>): Boolean {
+        val expectedComponent = ComponentName(this, serviceClass)
+        val enabledServices = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        return enabledServices?.split(':')?.any {
+            ComponentName.unflattenFromString(it) == expectedComponent
+        } == true
     }
 
     private fun StartShopeeCoinService(mainActivity: MainActivity) {
