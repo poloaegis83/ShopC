@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
                 TextField(
                     value = text2,
                     onValueChange = { text2 = it },
-                    label = { Text("底線值 (預設0.2)") },
+                    label = { Text("輸入底線值") },
                     singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
                     modifier = Modifier.width(200.dp)
@@ -194,13 +194,13 @@ class MainActivity : ComponentActivity() {
                     Text("設定底線值")
                 }
             }
-            Text("底線值：$text2")
+            Text("自訂底線值：$text2")
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
                     .padding(vertical = 8.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
-                color = Color.Black     // 線的顏色
+                color = Color.Gray     // 線的顏色
             )
             Button(
                 onClick = { StartShopeeCoinService(this@MainActivity) },
@@ -314,7 +314,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
                     .padding(vertical = 8.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
-                color = Color.Black     // 線的顏色
+                color = Color.Gray     // 線的顏色
             )
             CoinStatsScreen(coinStorage)
             HorizontalDivider(
@@ -322,7 +322,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
                     .padding(vertical = 8.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
-                color = Color.Black     // 線的顏色
+                color = Color.Gray     // 線的顏色
             )
             AccessibilityStatusScreen()
         }
