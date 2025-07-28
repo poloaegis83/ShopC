@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -166,7 +168,6 @@ class MainActivity : ComponentActivity() {
         val screenWidth = configuration.screenWidthDp.dp
         val componentWidth = screenWidth * 0.6f  // 元件寬度 = 螢幕的 85%
 
-        var text1 by remember { mutableStateOf("") }
         var text2 by remember { mutableStateOf("") }
 
         Column(modifier = Modifier.padding(top = 50.dp, start = 1.dp)
@@ -187,14 +188,20 @@ class MainActivity : ComponentActivity() {
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
                     modifier = Modifier.width(200.dp)
                 )
-                Text("底線值：$text2")
+                Button(
+                    onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
+                ) {
+                    Text("設定底線值")
+                }
             }
-            Button(
-                onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
-            ) {
-                Text("設定底線值")
-            }
-            Spacer(modifier = Modifier.height(20.dp))
+            Text("底線值：$text2")
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
+                    .padding(vertical = 8.dp), // 上下間距
+                thickness = 2.dp,        // 線的粗細
+                color = Color.Black     // 線的顏色
+            )
             Button(
                 onClick = { StartShopeeCoinService(this@MainActivity) },
                 modifier = Modifier.width(componentWidth)
@@ -206,8 +213,9 @@ class MainActivity : ComponentActivity() {
                 fontSize = 14.sp,
                 modifier = Modifier.fillMaxWidth()
                 )
+
             Row(
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
@@ -262,7 +270,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Row(
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
@@ -301,7 +309,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
+                    .padding(vertical = 8.dp), // 上下間距
+                thickness = 2.dp,        // 線的粗細
+                color = Color.Black     // 線的顏色
+            )
             CoinStatsScreen(coinStorage)
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
+                    .padding(vertical = 8.dp), // 上下間距
+                thickness = 2.dp,        // 線的粗細
+                color = Color.Black     // 線的顏色
+            )
             AccessibilityStatusScreen()
         }
     }
