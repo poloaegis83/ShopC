@@ -28,10 +28,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -72,6 +74,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var screenCaptureLauncher: ActivityResultLauncher<Intent>      // MediaProjection的權限
     private lateinit var mediaProjectionManager: MediaProjectionManager             // MediaProjection的權限
     private var mediaProjection: MediaProjection? = null                            // MediaProjection的權限
+    private lateinit var coinStorage: CoinClaimStorage
+
+
 
     //@RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,8 +125,9 @@ class MainActivity : ComponentActivity() {
             gHeightOffset = (realHeight - NavigationBarHeight - availableHeight).toFloat()
         }
 
-        enableEdgeToEdge()
+        coinStorage = CoinClaimStorage(this)
 
+        enableEdgeToEdge()
 
         setContent {
             Shopee_coinTheme {
@@ -143,7 +149,6 @@ class MainActivity : ComponentActivity() {
                 }// end of Scaffold
             } // end of Shopee_coinTheme
         }  // end of setContent
-
 
         // ✅ 啟動前景服務（mediaProjection 專用）
         //val intent = Intent(this, ScreenCaptureService::class.java)
@@ -167,24 +172,29 @@ class MainActivity : ComponentActivity() {
         Column(modifier = Modifier.padding(top = 50.dp, start = 1.dp)
             .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
         ) {
-
-            TextField(
-                value = text2,
-                onValueChange = { text2 = it },
-                label = { Text("輸入 底線值 (預設0.2)") },
-                singleLine = true,
-                modifier = Modifier.width(componentWidth)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text("底線值：$text2")
-            Spacer(modifier = Modifier.height(10.dp))
-            Button(
-                onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f ) },
-                modifier = Modifier.width(componentWidth)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp) // 元件之間間距
             ) {
-                Text("蝦皮 設定底線值")
+                TextField(
+                    value = text2,
+                    onValueChange = { text2 = it },
+                    label = { Text("底線值 (預設0.2)") },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                    modifier = Modifier.width(200.dp)
+                )
+                Text("底線值：$text2")
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
+            ) {
+                Text("設定底線值")
+            }
+            Spacer(modifier = Modifier.height(20.dp))
             Button(
                 onClick = { StartShopeeCoinService(this@MainActivity) },
                 modifier = Modifier.width(componentWidth)
@@ -192,7 +202,10 @@ class MainActivity : ComponentActivity() {
                 Text("按此開始 蝦幣 偵測")
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text("tips: 按蝦幣偵測後 \"懸浮按鈕\"開到ON 才會做動 請開無障礙服務")
+            Text("tips:按蝦幣偵測後 \"懸浮按鈕\"開到ON 才會做動",
+                fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth()
+                )
             Row(
                 modifier = Modifier.padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -209,7 +222,7 @@ class MainActivity : ComponentActivity() {
                     //)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Low-End Device(低階裝置用，反應變慢)")
+                Text(text = "Low-End Device(低階裝置用，變慢)")
             }
             val initialStartTime = String.format("%02d:%02d", GlobalValueHolder.StartHour, GlobalValueHolder.StartMinute)
             val initialEndTime = String.format("%02d:%02d", GlobalValueHolder.EndHour, GlobalValueHolder.EndMinute)
@@ -268,24 +281,107 @@ class MainActivity : ComponentActivity() {
             }
 
             if (isTimeLimit) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Button(onClick = { timePickerDialogStart.show() }) {
-                        Text("選擇開始時間")
+                Row(modifier = Modifier.padding(8.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Button(onClick = { timePickerDialogStart.show() }) {
+                            Text("選擇開始時間")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("開始時間：$selectedTimeStart")
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("開始時間：$selectedTimeStart")
+
+                    Spacer(modifier = Modifier.width(10.dp)) // 兩個欄之間的間距
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Button(onClick = { timePickerDialogEnd.show() }) {
+                            Text("選擇結束時間")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("結束時間：$selectedTimeEnd")
+                    }
                 }
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Button(onClick = { timePickerDialogEnd.show() }) {
-                        Text("選擇結束時間")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("結束時間：$selectedTimeEnd")
+            }
+            CoinStatsScreen(coinStorage)
+            AccessibilityStatusScreen()
+        }
+    }
+
+    @Composable
+    fun CoinStatsScreen(storage: CoinClaimStorage) {
+        var todayCount by remember { mutableStateOf(0) }
+        var todayAverage by remember { mutableStateOf(0.0) }
+        var averageInterval by remember { mutableStateOf(0L) }  // 以毫秒為單位
+
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    val allClaims = storage.getClaims()
+
+                    val today = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+
+                    val todayClaims = allClaims.filter { it.timestamp >= today }
+                        .sortedBy { it.timestamp }  // 時間排序
+
+                    todayCount = todayClaims.size
+                    todayAverage = if (todayClaims.isNotEmpty())
+                        todayClaims.sumOf { it.amount } / todayClaims.size
+                    else 0.0
+
+                    // ➕ 計算平均間距（毫秒）
+                    averageInterval = if (todayClaims.size >= 2) {
+                        val intervals = todayClaims.zipWithNext { a, b -> b.timestamp - a.timestamp }
+                        intervals.sum() / intervals.size
+                    } else 0L
                 }
             }
 
-             AccessibilityStatusScreen()
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
 
+        // 更新統計資料的邏輯抽出成函數方便重用
+        fun updateStats() {
+            val allClaims = storage.getClaims()
+            val today = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val todayClaims = allClaims.filter { it.timestamp >= today }
+
+            todayCount = todayClaims.size
+            todayAverage = if (todayClaims.isNotEmpty())
+                todayClaims.sumOf { it.amount } / todayClaims.size
+            else 0.0
+        }
+
+
+        Column(modifier = Modifier.padding(5.dp)) {
+            Text(text = "今天自動領取：$todayCount 次, 平均領取：${"%.2f".format(todayAverage)}")
+            if (todayCount >= 2) {
+                val minutes = averageInterval / 1000 / 60
+                val seconds = (averageInterval / 1000) % 60
+                Text("平均間距：${minutes}分 ${seconds}秒")
+            } else {
+                Text("平均間距：--")
+            }
+            Spacer(modifier = Modifier.height(3.dp))
+            Button(onClick = {
+                storage.clearClaims()
+                updateStats()  // 清除後立即更新畫面
+            }) {
+                Text("清除紀錄")
+            }
         }
     }
 

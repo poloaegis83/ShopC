@@ -63,6 +63,8 @@ class ScreenCaptureService : Service() {
 
     var CoinStates = CState.COIN_START
 
+    //val CoinClaimStorage = CoinClaimStorage(this)
+
     enum class CState {
         COIN_START ,GET_COIN_READY, WAITING_COIN, SEARCHING_COIN, PAGE_COIN_NOT_FIND, NOT_FIND_DOING_FRESH, COIN_VAULE_FIND
     }
@@ -78,6 +80,29 @@ class ScreenCaptureService : Service() {
     val metrics = Resources.getSystem().displayMetrics
 
     var IsMLCallback = false
+    private lateinit var coinClaimStorage: CoinClaimStorage
+
+    object RecordCionLimiter {
+        private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
+
+        fun canCall(): Boolean {
+            val now = System.currentTimeMillis()
+            val fiveMinutesMillis = 5 * 60 * 1000  // 5分鐘 = 300,000 毫秒
+
+            return if (now - lastCallTime >= fiveMinutesMillis) {
+                lastCallTime = now
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+
+    override fun onCreate() {
+        super.onCreate()
+        coinClaimStorage = CoinClaimStorage(this)  // this 是 context
+    }
 
     @RequiresApi(Build.VERSION_CODES.N)
     override fun onStartCommand(intent: Intent?
@@ -376,6 +401,7 @@ class ScreenCaptureService : Service() {
     suspend fun processEventCaseImage(image: Bitmap) {
         return suspendCoroutine { cont ->
 
+            val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
             val regex8 = Regex("加活動")
             val regex7 = Regex("^再[試式]一次")
             val regex6 = Regex("[網罔]路[連蓮]線")
@@ -383,7 +409,9 @@ class ScreenCaptureService : Service() {
             val regex4 = Regex("[禾未千末朱]獲得")
             val regex3 = Regex("[獎賞][勵歷]派[發髮]")
             val regex2 = Regex("[禾未千末朱]獲得寵粉")
-            val regex1 = Regex("[直置][播波]還可領取")
+            val regex1 = Regex("[直置][播波]還可[領领]取")
+            var CoinValueFind = false
+            var CoinValue = 0f
 
             TextRecognizerUtil.recognizeTextFromImage(
                 bitmap = image,
@@ -400,11 +428,26 @@ class ScreenCaptureService : Service() {
                                 val matches6 = regex6.find(line.text)
                                 val matches7 = regex7.find(line.text)
                                 val matches8 = regex8.find(line.text)
+                                val matches9 = regex9.find(line.text)
 
                                 Log.d("OCR_Line", "文字內容：${line.text}")
                                 //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+                                if (matches9 != null && !CoinValueFind) {
+                                    if (RecordCionLimiter.canCall()){
+                                        Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
+                                        CoinValue = matches9.groups[1]?.value?.toFloat()!!
+                                        CoinValueFind = true
+                                    }
+                                }
+
                                 if (matches1 != null) {
                                     Log.d("RegexMatch", "找到  本場直播還可領取")
+                                    if (CoinValueFind && CoinValue != 0f) {
+                                        Log.d("RegexMatch", "ADDD coinClaimStorage")
+                                        coinClaimStorage.addClaim(CoinClaim(amount = CoinValue.toDouble()))
+                                        CoinValueFind = false
+                                    }
+
                                     serviceScope.launch {
                                         MoveActionMutex.withLock {
                                             GetCoinAndQuickRefreshPage()
@@ -497,7 +540,7 @@ class ScreenCaptureService : Service() {
 
             val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
             val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-            val regex3 = Regex("^領取")
+            val regex3 = Regex("^[領领]取")
             val regex4 = Regex("^重試")
             //val regex5 = Regex("已結束")
 
