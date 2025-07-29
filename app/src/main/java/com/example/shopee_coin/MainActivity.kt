@@ -363,15 +363,23 @@ class MainActivity : ComponentActivity() {
         // UI 顯示區塊
         Column(modifier = Modifier.padding(5.dp)) {
             Text(
-                text = "今天自動領取：$todayCount 次，平均：${"%.2f".format(todayAverage)}，共：${"%.2f".format(totalAmount)}"
+                text = "今天領取：$todayCount 次，均：${"%.2f".format(todayAverage)}，合：${"%.2f".format(totalAmount)}",
+                fontSize = 13.sp,
+                modifier = Modifier.fillMaxWidth()
             )
 
             if (todayCount >= 2) {
                 val minutes = averageInterval / 1000 / 60
                 val seconds = (averageInterval / 1000) % 60
-                Text("平均間距：${minutes}分 ${seconds}秒")
+                Text("平均間距：${minutes}分 ${seconds}秒",
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
             } else {
-                Text("平均間距：--")
+                Text("平均間距：--",
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
