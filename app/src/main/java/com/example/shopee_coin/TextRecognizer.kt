@@ -24,9 +24,6 @@ object TextRecognizerUtil {
         Log.d("OCR_", "辨識文字")
 
         recognizer.process(image)
-            //.addOnSuccessListener { visionText ->
-            //    onResult(visionText.text)
-            //}
             .addOnSuccessListener { visionText ->
                 onResult(visionText)
             }

@@ -9,9 +9,7 @@ import android.util.Log
 
 class ScreenCapturePermissionActivity : Activity() {
 
-
-    //private lateinit var screenCaptureLauncher: ActivityResultLauncher<Intent>      // MediaProjection的權限
-    private lateinit var mediaProjectionManager: MediaProjectionManager
+    private lateinit var mediaProjectionManager: MediaProjectionManager   // MediaProjection的權限
 
 
     override fun onCreate(savedInstanceState: Bundle?) {

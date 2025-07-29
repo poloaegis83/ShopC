@@ -9,12 +9,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
-import android.graphics.Bitmap
-import android.graphics.Rect
-import android.hardware.display.VirtualDisplay
-import android.media.ImageReader
-import android.media.projection.MediaProjection
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -73,12 +67,7 @@ import java.util.Calendar
 class MainActivity : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
-    private lateinit var screenCaptureLauncher: ActivityResultLauncher<Intent>      // MediaProjection的權限
-    private lateinit var mediaProjectionManager: MediaProjectionManager             // MediaProjection的權限
-    private var mediaProjection: MediaProjection? = null                            // MediaProjection的權限
     private lateinit var coinStorage: CoinClaimStorage
-
-
 
     //@RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,10 +140,6 @@ class MainActivity : ComponentActivity() {
                 }// end of Scaffold
             } // end of Shopee_coinTheme
         }  // end of setContent
-
-        // ✅ 啟動前景服務（mediaProjection 專用）
-        //val intent = Intent(this, ScreenCaptureService::class.java)
-        //startForegroundService(intent)
 
     }
 
@@ -332,9 +317,12 @@ class MainActivity : ComponentActivity() {
     fun CoinStatsScreen(storage: CoinClaimStorage) {
         var todayCount by remember { mutableStateOf(0) }
         var todayAverage by remember { mutableStateOf(0.0) }
-        var averageInterval by remember { mutableStateOf(0L) }  // 以毫秒為單位
+        var averageInterval by remember { mutableStateOf(0L) }
+        var totalAmount by remember { mutableStateOf(0f) }
 
         val lifecycleOwner = LocalLifecycleOwner.current
+
+        // 每次畫面回到前景時更新統計資料
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
@@ -347,15 +335,18 @@ class MainActivity : ComponentActivity() {
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
 
+                    // 過濾與儲存「今天」的紀錄
                     val todayClaims = allClaims.filter { it.timestamp >= today }
-                        .sortedBy { it.timestamp }  // 時間排序
+                    storage.saveClaims(todayClaims)
 
+                    // 統計資料
                     todayCount = todayClaims.size
                     todayAverage = if (todayClaims.isNotEmpty())
                         todayClaims.sumOf { it.amount } / todayClaims.size
                     else 0.0
 
-                    // ➕ 計算平均間距（毫秒）
+                    totalAmount = todayClaims.sumOf { it.amount }.toFloat()
+
                     averageInterval = if (todayClaims.size >= 2) {
                         val intervals = todayClaims.zipWithNext { a, b -> b.timestamp - a.timestamp }
                         intervals.sum() / intervals.size
@@ -369,27 +360,12 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 更新統計資料的邏輯抽出成函數方便重用
-        fun updateStats() {
-            val allClaims = storage.getClaims()
-            val today = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-            val todayClaims = allClaims.filter { it.timestamp >= today }
-
-            todayCount = todayClaims.size
-            todayAverage = if (todayClaims.isNotEmpty())
-                todayClaims.sumOf { it.amount } / todayClaims.size
-            else 0.0
-        }
-
-
+        // UI 顯示區塊
         Column(modifier = Modifier.padding(5.dp)) {
-            Text(text = "今天自動領取：$todayCount 次, 平均領取：${"%.2f".format(todayAverage)}")
+            Text(
+                text = "今天自動領取：$todayCount 次，平均：${"%.2f".format(todayAverage)}，共：${"%.2f".format(totalAmount)}"
+            )
+
             if (todayCount >= 2) {
                 val minutes = averageInterval / 1000 / 60
                 val seconds = (averageInterval / 1000) % 60
@@ -397,10 +373,15 @@ class MainActivity : ComponentActivity() {
             } else {
                 Text("平均間距：--")
             }
-            Spacer(modifier = Modifier.height(3.dp))
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Button(onClick = {
                 storage.clearClaims()
-                updateStats()  // 清除後立即更新畫面
+                todayCount = 0
+                todayAverage = 0.0
+                averageInterval = 0L
+                totalAmount = 0f
             }) {
                 Text("清除紀錄")
             }
@@ -490,18 +471,10 @@ class MainActivity : ComponentActivity() {
     private fun StartShopeeCoinService(mainActivity: MainActivity) {
         // 由此開始 錄製
         // MediaProjection 的權限 in 另一個 activity
-        //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
+
         val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         startActivity(intent)
-    }
-
-    //
-    // MediaProjection的截圖
-    //
-    private fun requestScreenCapturePermission() {
-        val intent = mediaProjectionManager.createScreenCaptureIntent()
-        screenCaptureLauncher.launch(intent)
     }
 
     private fun SetDownValue(DownValue:Float){
@@ -516,111 +489,6 @@ class MainActivity : ComponentActivity() {
         Log.d("GlobalValueHolder", "DownValue ${GlobalValueHolder.DownValue}")
     }
 
-    //
-    // MediaProjection的截圖
-    //
-    private lateinit var imageReader: ImageReader
-    private var virtualDisplay: VirtualDisplay? = null
-    // 每 10 秒呼叫這個來擷取畫面
-    // **新增開始**
-    private fun takeScreenshot( activity: ComponentActivity) {
-        Log.d("shot", "takeScreenshot")
-/*
-        if (mediaProjection == null) {
-            //requestScreenCapturePermission()
-            Toast.makeText(this, "尚未取得螢幕擷取權限", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!isOn) return
-        Log.d("shot", "takeScreenshot2")
-
-        val screenDensity = resources.displayMetrics.densityDpi
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
-
-        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
-
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "ScreenCapture",
-            screenWidth,
-            screenHeight,
-            screenDensity,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader.surface,
-            null,
-            null
-        )
-
-        //val CutBitmap = cropToTopRightQuarter (bitmap)
-        imageReader.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
-
-            val plane = image.planes[0]
-            val buffer = plane.buffer
-            val pixelStride = plane.pixelStride
-            val rowStride = plane.rowStride
-            val rowPadding = rowStride - pixelStride * screenWidth
-
-            val bitmap = createBitmap(screenWidth + rowPadding / pixelStride, screenHeight)
-            bitmap.copyPixelsFromBuffer(buffer)
-            image.close()
-            runOnUiThread {
-                Log.d("shot", "imageReader 已成功擷取畫面 Bitmap！")
-            }
-        }, Handler(Looper.getMainLooper()))
-
-
-        val SnapShot = createBitmap(view.width, view.height)
-        val canvas = Canvas(SnapShot)
-        view.draw(canvas)
-
-        val CutBitmap = cropToTopRightQuarter (SnapShot)
-
-        //val filename = "screenshot_${System.currentTimeMillis()}.png"
-        //val directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-        //val file = File(directory, filename)
-
-        /*try {
-            FileOutputStream(file).use { out ->
-                CutBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                Toast.makeText(activity, "截圖已儲存至 ${file.absolutePath}", Toast.LENGTH_LONG).show()
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Toast.makeText(activity, "截圖失敗: ${e.message}", Toast.LENGTH_LONG).show()
-        }*/
-
-        // ML 辨識
-        TextRecognizerUtil.recognizeTextFromImage(
-            bitmap = CutBitmap,
-            context = this, // activity context
-            onResult = { resultText ->
-                // 在這裡接收到辨識的文字
-                Log.d("OCR_Result", "辨識文字內容：$resultText")
-                // 顯示在畫面上 Toast
-                Toast.makeText(this, "辨識到：$resultText", Toast.LENGTH_LONG).show()
-            },
-            onError = { error ->
-                Log.e("OCR_Result", "辨識錯誤：${error.message}")
-            }
-        )*/
-    }
-    // **新增結束**
-
-
-    //裁切圖片為右上角四分之一區域
-    private fun cropToTopRightQuarter(bitmap: Bitmap): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-        val croppedWidth = width / 2
-        val croppedHeight = height / 2
-
-        val rect = Rect(croppedWidth, 0, width, croppedHeight)
-        return Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
-    }
-
-
     override fun onDestroy() {
         super.onDestroy()
         // Activity 銷毀時停止定時
@@ -632,7 +500,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.d("OCR_Result", "onResumeonResumeonResumeonResumeonResumeonResumeonResumeonResumeonResumeonResume")
+        Log.d("OCR_Result", "onResume")
 
         /*if (MediaProjectionHolder.resultData != null && mediaProjection == null) {
             val mediaProjectionManager =
