@@ -427,7 +427,7 @@ class ScreenCaptureService : Service() {
             val regex6 = Regex("[網罔]路[連蓮]線")
             val regex5 = Regex("手速搶紅包")
             val regex4 = Regex("[禾未千末朱]獲得")
-            val regex3 = Regex("[獎賞][勵歷]派[發髮]")
+            val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
             val regex2 = Regex("[禾未千末朱]獲得寵粉")
             val regex1 = Regex("[直置真][播波插]還可[領领]取")
             var CoinValueFind = false
