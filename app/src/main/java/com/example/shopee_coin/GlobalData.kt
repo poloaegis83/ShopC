@@ -18,6 +18,7 @@ object GlobalValueHolder {
 }
 
 var gHeightOffset: Float = 0.0f
+var gTotalHeight: Float = 0.0f
 
 data class CoinClaim(
     val amount: Double,

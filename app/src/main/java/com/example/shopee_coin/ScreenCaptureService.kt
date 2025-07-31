@@ -45,7 +45,8 @@ class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private val handler = Handler(Looper.getMainLooper())
-
+    private var AdaptiveGetCoinButtonY = 0f
+    private var Adaptive_try_limit = 0
     private val UpscaleRate = 2f
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -94,6 +95,22 @@ class ScreenCaptureService : Service() {
                 true
             } else {
                 false
+            }
+        }
+    }
+
+    object CoinButtonLimiter {
+        private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
+
+        fun canCall(): Boolean {
+            val now = System.currentTimeMillis()
+            val TwoMinutesMillis = 2 * 60 * 1000  // 2分鐘 = 300,000 毫秒
+
+            return if (now - lastCallTime >= TwoMinutesMillis) {
+                lastCallTime = now
+                false
+            } else {
+                true
             }
         }
     }
@@ -401,6 +418,9 @@ class ScreenCaptureService : Service() {
     suspend fun processEventCaseImage(image: Bitmap) {
         return suspendCoroutine { cont ->
 
+            var Positon_Y_GetCoinButton = 0f
+            var Positon_Y_GAP = 0f
+
             val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
             val regex8 = Regex("加活動")
             val regex7 = Regex("^再[試式]一次")
@@ -409,7 +429,7 @@ class ScreenCaptureService : Service() {
             val regex4 = Regex("[禾未千末朱]獲得")
             val regex3 = Regex("[獎賞][勵歷]派[發髮]")
             val regex2 = Regex("[禾未千末朱]獲得寵粉")
-            val regex1 = Regex("[直置][播波]還可[領领]取")
+            val regex1 = Regex("[直置真][播波插]還可[領领]取")
             var CoinValueFind = false
             var CoinValue = 0f
 
@@ -437,6 +457,8 @@ class ScreenCaptureService : Service() {
                                         Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                                         CoinValue = matches9.groups[1]?.value?.toFloat()!!
                                         CoinValueFind = true
+                                        Positon_Y_GetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
+                                        Log.d("Positon_Y_GetCoinButton", "Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
                                     }
                                 }
 
@@ -448,9 +470,36 @@ class ScreenCaptureService : Service() {
                                         CoinValueFind = false
                                     }
 
+                                    Positon_Y_GAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - Positon_Y_GetCoinButton
+
+                                    Positon_Y_GetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + Positon_Y_GAP*1.5f + gTotalHeight/4
+                                    Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${Positon_Y_GAP}, Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
+                                    if (AdaptiveGetCoinButtonY == 0f){
+                                        AdaptiveGetCoinButtonY = Positon_Y_GetCoinButton
+                                    }
+                                    var retry_gap:Float
+
+                                    if (CoinButtonLimiter.canCall()) {
+                                        //
+                                        // Only Adaptive Get Coin Button, triggered twice in 2 mins
+                                        //
+                                        if (AdaptiveGetCoinButtonY <= Positon_Y_GetCoinButton + Positon_Y_GAP) {
+                                            if (Adaptive_try_limit == 1) {
+                                                retry_gap = 5f
+                                            } else {
+                                                retry_gap = 10f
+                                            }
+                                            AdaptiveGetCoinButtonY += retry_gap
+                                        } else {
+                                            AdaptiveGetCoinButtonY -= 50f
+                                            Adaptive_try_limit = 1
+                                        }
+                                        Log.d("AdaptiveGetCoinButtonY update", "AdaptiveGetCoinButtonY update--> ${AdaptiveGetCoinButtonY}")
+                                    }
+                                    Log.d("AdaptiveGetCoinButtonY", "AdaptiveGetCoinButtonY --> ${AdaptiveGetCoinButtonY}")
                                     serviceScope.launch {
                                         MoveActionMutex.withLock {
-                                            GetCoinAndQuickRefreshPage()
+                                            GetCoinButton(metrics.widthPixels / 2f, AdaptiveGetCoinButtonY)
                                         }
                                     }
                                 }
@@ -837,6 +886,11 @@ class ScreenCaptureService : Service() {
         delay(1500L)
         QuickRefreshPage()
         delay(100L)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun GetCoinButton (x:Float, y:Float) {
+        TouchClick(x, y)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

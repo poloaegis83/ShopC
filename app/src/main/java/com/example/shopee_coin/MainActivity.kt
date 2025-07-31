@@ -110,8 +110,10 @@ class MainActivity : ComponentActivity() {
         val NavigationBarHeight =  getNavigationBarHeight(this)
         Log.d("NavigationBarHeight", "NavigationBarHeight: $NavigationBarHeight")
 
+        gTotalHeight = realHeight.toFloat()
         if (NavigationBarHeight == 0) {
             gHeightOffset = (realHeight - availableHeight).toFloat()
+
         } else {
             gHeightOffset = (realHeight - NavigationBarHeight - availableHeight).toFloat()
         }
@@ -527,7 +529,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = "$name!",
         modifier = modifier
     )
 }
