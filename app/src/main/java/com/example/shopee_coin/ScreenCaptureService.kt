@@ -928,48 +928,57 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun TouchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine<Unit> { cont ->
+    private suspend fun TouchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
+        val result = ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(Unit) // 成功完成
+                cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(Unit) // 或視需求 throw CancellationException()
+                cont.resume(true)// 或視需求 throw CancellationException()
             }
-        })
+        })?: false
+        if (!result) {
+            cont.resume(false) // 直接 resume false
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun TouchRightLeft (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine<Unit> { cont ->
+    private suspend fun TouchRightLeft (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
+        val result = ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(Unit) // 成功完成
+                cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(Unit) // 或視需求 throw CancellationException()
+                cont.resume(true) // 或視需求 throw CancellationException()
             }
-        })
+        })?: false
+        if (!result) {
+            cont.resume(false) // 直接 resume false
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun TouchClick (X: Float, Y: Float) = suspendCancellableCoroutine<Unit> { cont ->
+    private suspend fun TouchClick (X: Float, Y: Float) = suspendCancellableCoroutine { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.click(X, Y , object : AccessibilityService.GestureResultCallback() {
+        val result = ACservice?.click(X, Y , object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(Unit) // 成功完成
+                cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(Unit) // 或視需求 throw CancellationException()
+                cont.resume(true) // 或視需求 throw CancellationException()
             }
-        })
+        })?: false
+        if (!result) {
+            cont.resume(false) // 直接 resume false
+        }
     }
 
     private fun cleanup() {

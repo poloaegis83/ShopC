@@ -47,7 +47,7 @@ class MyAccessibilityService : AccessibilityService() {
         toY: Float,
         duration: Long = 1000L,
         callback: GestureResultCallback
-    ) {
+    ): Boolean {
         val path = Path()
         path.moveTo(fromX, fromY)
         path.lineTo(toX, toY)
@@ -55,8 +55,14 @@ class MyAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, duration)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
-        dispatchGesture(gesture, callback, null)
-        Log.d("MyAccessibilityService", "已執行滑動手勢")
+        val result = dispatchGesture(gesture, callback, null)
+
+        if (result) {
+            Log.d("MyAccessibilityService", "已執行滑動手勢")
+        } else {
+            Log.e("MyAccessibilityService", "滑動手勢失敗")
+        }
+        return result
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -64,7 +70,7 @@ class MyAccessibilityService : AccessibilityService() {
         x: Float,
         y: Float,
         callback: GestureResultCallback
-        ) {
+        ): Boolean  {
         val path = Path().apply {
             moveTo(x, y)
             lineTo(x + 0.3f, y + 0.3f)  // 建議畫出 1px 的點擊動作
@@ -79,6 +85,7 @@ class MyAccessibilityService : AccessibilityService() {
         } else {
             Log.e("MyAccessibilityService", "點擊手勢失敗")
         }
+        return result
     }
 
 }
