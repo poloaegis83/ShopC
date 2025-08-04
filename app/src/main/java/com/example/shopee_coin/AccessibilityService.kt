@@ -40,7 +40,14 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    fun swipe(fromX: Float, fromY: Float, toX: Float, toY: Float, duration: Long = 1000L) {
+    fun swipe(
+        fromX: Float,
+        fromY: Float,
+        toX: Float,
+        toY: Float,
+        duration: Long = 1000L,
+        callback: GestureResultCallback
+    ) {
         val path = Path()
         path.moveTo(fromX, fromY)
         path.lineTo(toX, toY)
@@ -48,12 +55,16 @@ class MyAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, duration)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
-        dispatchGesture(gesture, null, null)
+        dispatchGesture(gesture, callback, null)
         Log.d("MyAccessibilityService", "已執行滑動手勢")
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    fun click(x: Float, y: Float) {
+    fun click(
+        x: Float,
+        y: Float,
+        callback: GestureResultCallback
+        ) {
         val path = Path().apply {
             moveTo(x, y)
             lineTo(x + 0.3f, y + 0.3f)  // 建議畫出 1px 的點擊動作
@@ -62,7 +73,7 @@ class MyAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, 200)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
-        val result = dispatchGesture(gesture, null, null)
+        val result = dispatchGesture(gesture, callback, null)
         if (result) {
             Log.d("MyAccessibilityService", "已執行點擊手勢：($x, $y)")
         } else {

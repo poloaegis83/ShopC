@@ -1,5 +1,7 @@
 package com.example.shopee_coin
 
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.annotation.SuppressLint
 import android.app.Activity.RESULT_OK
 import android.app.Notification
@@ -26,18 +28,20 @@ import android.os.Looper
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import com.google.mlkit.vision.text.Text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resumeWithException
 
 var CoinValueList = mutableListOf (0f)
 
@@ -407,133 +411,135 @@ class ScreenCaptureService : Service() {
 
         val cutBitmapHalf = BitmapCropLib.cropToVerticalMiddleTwo (bitmap)
 
+        suspendCancellableCoroutine<Unit> { cont ->
+            TextRecognizerUtil.recognizeTextFromImage(
+                bitmap = cutBitmapHalf,
+                context = this, // activity context
+                onResult = { resultText ->
+                    CoroutineScope(Dispatchers.Default).launch {
+                        try {
+                            processEventCaseImage(resultText)
+                            cont.resume(Unit)
+                        } catch (e: Exception) {
+                            cont.resumeWithException(e)
+                        } finally {
+                            cutBitmapHalf.recycle()
+                        }
+                    }
+                },
+                onError ={
+                   cont.resumeWithException(it ?: RuntimeException("Unknown OCR Error"))
+                   cutBitmapHalf.recycle()
+                }
+            )
+        }
+
+
         //
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
-        processEventCaseImage(cutBitmapHalf)
+        //processEventCaseImage(cutBitmapHalf)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    suspend fun processEventCaseImage(image: Bitmap) {
-        return suspendCoroutine { cont ->
+    suspend fun processEventCaseImage(resultText: Text) {
 
-            var Positon_Y_GetCoinButton = 0f
-            var Positon_Y_GAP = 0f
+        var Positon_Y_GetCoinButton = 0f
+        var Positon_Y_GAP = 0f
 
-            val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
-            val regex8 = Regex("加活動")
-            val regex7 = Regex("^再[試式]一次")
-            val regex6 = Regex("[網罔]路[連蓮]線")
-            val regex5 = Regex("手速搶紅包")
-            val regex4 = Regex("[禾未千末朱]獲得")
-            val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
-            val regex2 = Regex("[禾未千末朱]獲得寵粉")
-            val regex1 = Regex("[直置真][播波插]還可[領领]取")
-            var CoinValueFind = false
-            var CoinValue = 0f
+        val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
+        val regex8 = Regex("加活動")
+        val regex7 = Regex("^再[試式]一次")
+        val regex6 = Regex("[網罔]路[連蓮]線")
+        val regex5 = Regex("手速搶紅包")
+        val regex4 = Regex("[禾未千末朱]獲得")
+        val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
+        val regex2 = Regex("[禾未千末朱]獲得寵粉")
+        val regex1 = Regex("[直置真][播波插]還可[領领]取")
+        var CoinValueFind = false
+        var CoinValue = 0f
 
-            TextRecognizerUtil.recognizeTextFromImage(
-                bitmap = image,
-                context = this, // activity context
-                onResult = { resultText ->
-                    try {
-                        for (block in resultText.textBlocks) {
-                            for (line in block.lines) {
-                                val matches1 = regex1.find(line.text)
-                                val matches2 = regex2.find(line.text)
-                                val matches3 = regex3.find(line.text)
-                                val matches4 = regex4.find(line.text)
-                                val matches5 = regex5.find(line.text)
-                                val matches6 = regex6.find(line.text)
-                                val matches7 = regex7.find(line.text)
-                                val matches8 = regex8.find(line.text)
-                                val matches9 = regex9.find(line.text)
+        try {
+            for (block in resultText.textBlocks) {
+                for (line in block.lines) {
+                    val matches1 = regex1.find(line.text)
+                    val matches2 = regex2.find(line.text)
+                    val matches3 = regex3.find(line.text)
+                    val matches4 = regex4.find(line.text)
+                    val matches5 = regex5.find(line.text)
+                    val matches6 = regex6.find(line.text)
+                    val matches7 = regex7.find(line.text)
+                    val matches8 = regex8.find(line.text)
+                    val matches9 = regex9.find(line.text)
 
-                                Log.d("OCR_Line", "文字內容：${line.text}")
-                                //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
-                                if (matches9 != null && !CoinValueFind) {
-                                    if (RecordCionLimiter.canCall()){
-                                        Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
-                                        CoinValue = matches9.groups[1]?.value?.toFloat()!!
-                                        CoinValueFind = true
-                                        Positon_Y_GetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
-                                        Log.d("Positon_Y_GetCoinButton", "Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
-                                    }
-                                }
-
-                                if (matches1 != null) {
-                                    Log.d("RegexMatch", "找到  本場直播還可領取")
-                                    if (CoinValueFind && CoinValue != 0f) {
-                                        Log.d("RegexMatch", "ADDD coinClaimStorage")
-                                        coinClaimStorage.addClaim(CoinClaim(amount = CoinValue.toDouble()))
-                                        CoinValueFind = false
-                                    }
-
-                                    Positon_Y_GAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - Positon_Y_GetCoinButton
-
-                                    Positon_Y_GetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + Positon_Y_GAP*1.5f + gTotalHeight/4
-                                    Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${Positon_Y_GAP}, Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
-                                    if (AdaptiveGetCoinButtonY == 0f){
-                                        AdaptiveGetCoinButtonY = Positon_Y_GetCoinButton
-                                    }
-                                    val retry_gap = 10f
-
-                                    if (CoinButtonLimiter.canCall()) {
-                                        //
-                                        // Only Adaptive Get Coin Button, triggered twice in 2 mins
-                                        //
-                                        if (AdaptiveGetCoinButtonY <= Positon_Y_GetCoinButton + Positon_Y_GAP) {
-                                            AdaptiveGetCoinButtonY += retry_gap
-                                        } else {
-                                            AdaptiveGetCoinButtonY -= 80f
-                                        }
-                                        Log.d("AdaptiveGetCoinButtonY update", "AdaptiveGetCoinButtonY update--> ${AdaptiveGetCoinButtonY}")
-                                    }
-                                    Log.d("AdaptiveGetCoinButtonY", "AdaptiveGetCoinButtonY --> ${AdaptiveGetCoinButtonY}")
-                                    serviceScope.launch {
-                                        MoveActionMutex.withLock {
-                                            GetCoinButton(metrics.widthPixels / 2f, AdaptiveGetCoinButtonY)
-                                        }
-                                    }
-                                }
-                                if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
-                                    Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
-                                    PlatformBackGesture()
-                                }
-                                if (matches5 != null) {
-                                    CoroutineScope(Dispatchers.Main).launch {
-                                        repeat(10) {
-                                            TouchClick(metrics.widthPixels / 2f, metrics.heightPixels / 2f)
-                                            delay(400L)
-                                        }
-                                    }
-                                }
-                                if (matches6 != null) {
-                                    Log.d("move", "網路連線 with QuickRefreshPage")
-                                    serviceScope.launch {
-                                        MoveActionMutex.withLock {
-                                            QuickRefreshPage()
-                                        }
-                                    }
-                                }
-                                if (matches7 != null) {
-                                    line.boundingBox?.let { box ->
-                                        TouchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
-                                    }
-                                }
-                            }
+                    Log.d("OCR_Line", "文字內容：${line.text}")
+                    //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+                    if (matches9 != null && !CoinValueFind) {
+                        if (RecordCionLimiter.canCall()){
+                            Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
+                            CoinValue = matches9.groups[1]?.value?.toFloat()!!
+                            CoinValueFind = true
+                            Positon_Y_GetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
+                            Log.d("Positon_Y_GetCoinButton", "Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
                         }
-                    } finally {
-                        image.recycle()
-                        cont.resume(Unit) // ✅ 確保 coroutine 結束
                     }
-                },
-                onError = { error ->
-                    Log.e("OCR_Result", "辨識錯誤：${error.message}")
-                    image.recycle()
-                    cont.resume(Unit) // ✅ 即使錯誤也要 resume
+
+                    if (matches1 != null) {
+                        Log.d("RegexMatch", "找到  本場直播還可領取")
+                        if (CoinValueFind && CoinValue != 0f) {
+                            Log.d("RegexMatch", "ADDD coinClaimStorage")
+                            coinClaimStorage.addClaim(CoinClaim(amount = CoinValue.toDouble()))
+                            CoinValueFind = false
+                        }
+
+                        Positon_Y_GAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - Positon_Y_GetCoinButton
+
+                        Positon_Y_GetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + Positon_Y_GAP*1.5f + gTotalHeight/4
+                        Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${Positon_Y_GAP}, Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
+                        if (AdaptiveGetCoinButtonY == 0f){
+                            AdaptiveGetCoinButtonY = Positon_Y_GetCoinButton
+                        }
+                        val retry_gap = 10f
+
+                        if (CoinButtonLimiter.canCall()) {
+                            //
+                            // Only Adaptive Get Coin Button, triggered twice in 2 mins
+                            //
+                            if (AdaptiveGetCoinButtonY <= Positon_Y_GetCoinButton + Positon_Y_GAP) {
+                                AdaptiveGetCoinButtonY += retry_gap
+                            } else {
+                                AdaptiveGetCoinButtonY -= 80f
+                            }
+                            Log.d("AdaptiveGetCoinButtonY update", "AdaptiveGetCoinButtonY update--> ${AdaptiveGetCoinButtonY}")
+                        }
+                        Log.d("AdaptiveGetCoinButtonY", "AdaptiveGetCoinButtonY --> ${AdaptiveGetCoinButtonY}")
+                        GetCoinButton(metrics.widthPixels / 2f, AdaptiveGetCoinButtonY)
+
+                    }
+                    if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
+                        Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
+                        PlatformBackGesture()
+                    }
+                    if (matches5 != null) {
+                        repeat(10) {
+                            TouchClick(metrics.widthPixels / 2f, metrics.heightPixels / 2f)
+                            delay(400L)
+                        }
+                    }
+                    if (matches6 != null) {
+                        Log.d("move", "網路連線 with QuickRefreshPage")
+                        QuickRefreshPage()
+                    }
+                    if (matches7 != null) {
+                        val box = line.boundingBox
+                        if (box != null) {
+                            TouchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                        }
+                    }
                 }
-            )
+            }
+        } finally {
+
         }
     }
 
@@ -550,7 +556,31 @@ class ScreenCaptureService : Service() {
         // cutBitmap = BitmapCropLib.toBinary(cutBitmap,200)
         //cutBitmap = BitmapCropLib.upscaleBitmap(cutBitmap, UpscaleRate.toInt())
 
-        processCoinCaseImage(cutBitmap)
+        suspendCancellableCoroutine<Unit> { cont ->
+            TextRecognizerUtil.recognizeTextFromImage(
+                bitmap = cutBitmap,
+                context = this, // activity context
+                onResult = { resultText ->
+                    CoroutineScope(Dispatchers.Default).launch {
+                        try {
+                            processCoinCaseImage(resultText)
+                            cont.resume(Unit)
+                        } catch (e: Exception) {
+                            cont.resumeWithException(e)
+                        } finally {
+                            cutBitmap.recycle()
+                        }
+                    }
+                },
+                onError ={
+                    cont.resumeWithException(it ?: RuntimeException("Unknown OCR Error"))
+                    cutBitmap.recycle()
+                }
+            )
+        }
+
+
+        //processCoinCaseImage(cutBitmap)
     }
 
     private fun last_notZero( Value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
@@ -575,10 +605,7 @@ class ScreenCaptureService : Service() {
 
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
-    suspend fun processCoinCaseImage(image: Bitmap) {
-
-
-        return suspendCoroutine { cont ->
+    suspend fun processCoinCaseImage(resultText: Text) {
 
             val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
             val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
@@ -592,167 +619,154 @@ class ScreenCaptureService : Service() {
 
             CoinStates = CState.SEARCHING_COIN
 
-            TextRecognizerUtil.recognizeTextFromImage(
-                bitmap = image,
-                context = this, // activity context
-                onResult = { resultText ->
-                    try {
-                        Log.d("image.height", "image.height：${image.height}")
+        try {
+            //Log.d("image.height", "image.height：${image.height}")
 
-                        OuterReg@ for (block in resultText.textBlocks) {
-                            for (line in block.lines) {
-                                Log.d("OCR_Line", "文字內容：${line.text}")
-                                //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
-                                val matches1 = regex1.find(line.text)
-                                if (matches1 != null  && last_notZero(matches1.value)) {
-                                    Log.d("RegexMatch", "找到Coin：${matches1.value}")
-                                    Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                    val CoinValue = matches1.value.toFloat()
-                                    Log.d("CoinValue", "CoinValue：${CoinValue}")
-                                    //CoinValueShows = 1
-                                    val boxc = line.boundingBox
-                                    if (boxc != null) {
-                                        //Coin_Position_x = (boxc.centerX()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
-                                        //Coin_Position_y = (boxc.centerY()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
-                                        Coin_Position_x = (boxc.centerX()).toFloat()
-                                        Coin_Position_y = realY ((boxc.centerY()).toFloat(),2)
-                                        Coin_Position_Height = boxc.height().toFloat()
-                                        Log.d("CoinValue", "boxc.bottom：${boxc.bottom} , boxc.top：${boxc.top}, boxc.centerY() ${boxc.centerY()} ,  height: = ${boxc.height()}")
+            OuterReg@ for (block in resultText.textBlocks) {
+                for (line in block.lines) {
+                    Log.d("OCR_Line", "文字內容：${line.text}")
+                    //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+                    val matches1 = regex1.find(line.text)
+                    if (matches1 != null  && last_notZero(matches1.value)) {
+                        Log.d("RegexMatch", "找到Coin：${matches1.value}")
+                        Log.d("OCR_Line", "位置：${line.boundingBox}")
+                        val CoinValue = matches1.value.toFloat()
+                        Log.d("CoinValue", "CoinValue：${CoinValue}")
+                        //CoinValueShows = 1
+                        val boxc = line.boundingBox
+                        if (boxc != null) {
+                            //Coin_Position_x = (boxc.centerX()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
+                            //Coin_Position_y = (boxc.centerY()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
+                            Coin_Position_x = (boxc.centerX()).toFloat()
+                            Coin_Position_y = realY ((boxc.centerY()).toFloat(),2)
+                            Coin_Position_Height = boxc.height().toFloat()
+                            Log.d("CoinValue", "boxc.bottom：${boxc.bottom} , boxc.top：${boxc.top}, boxc.centerY() ${boxc.centerY()} ,  height: = ${boxc.height()}")
 
-                                        Coin_Position_x += (metrics.widthPixels / 2f)+ (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
-                                        //Coin_Position_x += (metrics.widthPixels / 2f)
-                                        //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
-                                        Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
+                            Coin_Position_x += (metrics.widthPixels / 2f)+ (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
+                            //Coin_Position_x += (metrics.widthPixels / 2f)
+                            //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
+                            Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
 
-                                        //CoinStates = CState.COIN_VAULE_FIND
-                                    }
+                            //CoinStates = CState.COIN_VAULE_FIND
+                        }
 
-                                    if (CoinValue >= CoinValueSatisfy ){
-                                        Log.d("CoinValue p", "Coin COIN_VAULE_FIND  滿足")
-                                        CoinStates = CState.COIN_VAULE_FIND
-                                        NotFindConter = 0
-                                    }
-                                }
+                        if (CoinValue >= CoinValueSatisfy ){
+                            Log.d("CoinValue p", "Coin COIN_VAULE_FIND  滿足")
+                            CoinStates = CState.COIN_VAULE_FIND
+                            NotFindConter = 0
+                        }
+                    }
 
-                               // val matches5 = regex5.find(line.text)
-                               // if (matches5 != null) {
-                               //     Log.d("RegexMatch", "已結束")
-                               //     serviceScope.launch {
-                               //         MoveNextPage()
-                               //     }
-                               // }
+                   // val matches5 = regex5.find(line.text)
+                   // if (matches5 != null) {
+                   //     Log.d("RegexMatch", "已結束")
+                   //     serviceScope.launch {
+                   //         MoveNextPage()
+                   //     }
+                   // }
 
-                                val matches3 = regex3.find(line.text)
-                                if( matches3 != null) {
-                                    val boxg = line.boundingBox
-                                    if (boxg != null) {
-                                        if ( realY(boxg.centerY().toFloat(),2) >= Coin_Position_y) {  //check Get Coin Low Than Value  確保領取是比 coin 數字低
-                                            Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
-                                            Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                            CoinStates = CState.GET_COIN_READY
-                                            if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                                                Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
-                                                TouchClick(Coin_Position_x, Coin_Position_y)
-                                            }
-                                            break@OuterReg
-                                        } else {
-                                            Log.d("RegexMatch", "找到Coin 領取：${matches3.value}  但沒有比較低")
-                                        }
-                                    }
-                                }
-
+                    val matches3 = regex3.find(line.text)
+                    if( matches3 != null) {
+                        val boxg = line.boundingBox
+                        if (boxg != null) {
+                            if ( realY(boxg.centerY().toFloat(),2) >= Coin_Position_y) {  //check Get Coin Low Than Value  確保領取是比 coin 數字低
+                                Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                CoinStates = CState.GET_COIN_READY
                                 if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                                   val matches2 = regex2.find(line.text)
-                                     if (matches2 != null) {
-                                        Log.d("OCR_Line", "Coin T位置：${line.boundingBox}")
-                                        val boxt = line.boundingBox
-                                        if ( boxt != null){
-                                            //val timex = boxt.centerX().toFloat()
-                                            val timey = realY( boxt.top.toFloat(),2)
-                                            Log.d("OCR_Line", "Coin T位置 timey：${timey}")
-                                            if (timey <= Coin_Position_y + Coin_Position_Height*2.7){
-                                                //
-                                                // Check Coin Time 位置
-                                                //
-                                                Log.d("RegexMatch", "找到Coin Time：${matches2.value}")
-                                                //Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                                gFindCoinButNoTime = 0
+                                    Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
+                                    TouchClick(Coin_Position_x, Coin_Position_y)
+                                }
+                                break@OuterReg
+                            } else {
+                                Log.d("RegexMatch", "找到Coin 領取：${matches3.value}  但沒有比較低")
+                            }
+                        }
+                    }
 
-                                                Log.d("CoinStates", "CoinStates：${CoinStates}")
-                                                if(CoinStates == CState.COIN_VAULE_FIND) {
-                                                    //
-                                                    // 有時間才算找到
-                                                    //
-                                                    Log.d("RegexMatch", "有時間才算找到")
-                                                    CoinStates = CState.WAITING_COIN
-                                                    break@OuterReg
-                                                }
-                                            }
-                                        }
-                                     }
+                    if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                       val matches2 = regex2.find(line.text)
+                         if (matches2 != null) {
+                            Log.d("OCR_Line", "Coin T位置：${line.boundingBox}")
+                            val boxt = line.boundingBox
+                            if ( boxt != null){
+                                //val timex = boxt.centerX().toFloat()
+                                val timey = realY( boxt.top.toFloat(),2)
+                                Log.d("OCR_Line", "Coin T位置 timey：${timey}")
+                                if (timey <= Coin_Position_y + Coin_Position_Height*2.7){
+                                    //
+                                    // Check Coin Time 位置
+                                    //
+                                    Log.d("RegexMatch", "找到Coin Time：${matches2.value}")
+                                    //Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                    gFindCoinButNoTime = 0
 
-                                    val matches4 = regex4.find(line.text) //重試
-                                    if (matches4 != null) {
-                                        Log.d("move", "重試 with QuickRefreshPage")
-                                        serviceScope.launch {
-                                            MoveActionMutex.withLock {
-                                                QuickRefreshPage()
-                                            }
-                                        }
-                                        gFindCoinButNoTime = 0
-                                        CoinStates = CState.SEARCHING_COIN
+                                    Log.d("CoinStates", "CoinStates：${CoinStates}")
+                                    if(CoinStates == CState.COIN_VAULE_FIND) {
+                                        //
+                                        // 有時間才算找到
+                                        //
+                                        Log.d("RegexMatch", "有時間才算找到")
+                                        CoinStates = CState.WAITING_COIN
                                         break@OuterReg
                                     }
                                 }
+                            }
+                         }
 
-                                if (CoinStates == CState.COIN_VAULE_FIND) {
-                                    Log.d("CoinStates", "CState.COIN_VAULE_FIND")
-                                } else {
-                                    //
-                                    // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
-                                    //
-                                    //if (matches2 != null){
-                                    //   if (CoinValueShows == 0) {
-                                    //        CoinStates = CState.WAITING_COIN
-                                   //         Log.d("RegexMatchWA", "RegexMatch WA 找到時間 但沒有 coin value")
-                                   //     }
-                                   //     break@OuterReg
-                                    //}
-                                    //
-                                    // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
-                                    //
-                                    CoinStates = CState.PAGE_COIN_NOT_FIND
+                        val matches4 = regex4.find(line.text) //重試
+                        if (matches4 != null) {
+                            Log.d("move", "重試 with QuickRefreshPage")
+                            serviceScope.launch {
+                                MoveActionMutex.withLock {
+                                    QuickRefreshPage()
                                 }
                             }
+                            gFindCoinButNoTime = 0
+                            CoinStates = CState.SEARCHING_COIN
+                            break@OuterReg
                         }
-
-                        //
-                        // 找到coin 但沒時間 Fix with QuickRefreshPage
-                        //
-                        if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                            FindCoinButNoTimeHandler()
-                        }
-
-                        GetCoinFreezeHandler()
-                        NotFindCoinHandler()
-                        Log.d("gIsCapturing", "IsCapturing = false")
-
-                    } finally {
-                        image.recycle()
-                        cont.resume(Unit) // ✅ 確保 coroutine 結束
                     }
-                },
-                onError = { error ->
-                    Log.e("OCR_Result", "辨識錯誤：${error.message}")
-                    image.recycle()
-                    cont.resume(Unit) // ✅ 即使錯誤也要 resume
+
+                    if (CoinStates == CState.COIN_VAULE_FIND) {
+                        Log.d("CoinStates", "CState.COIN_VAULE_FIND")
+                    } else {
+                        //
+                        // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
+                        //
+                        //if (matches2 != null){
+                        //   if (CoinValueShows == 0) {
+                        //        CoinStates = CState.WAITING_COIN
+                       //         Log.d("RegexMatchWA", "RegexMatch WA 找到時間 但沒有 coin value")
+                       //     }
+                       //     break@OuterReg
+                        //}
+                        //
+                        // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
+                        //
+                        CoinStates = CState.PAGE_COIN_NOT_FIND
+                    }
                 }
-            )
+            }
+
+            //
+            // 找到coin 但沒時間 Fix with QuickRefreshPage
+            //
+            if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                FindCoinButNoTimeHandler()
+            }
+
+            GetCoinFreezeHandler()
+            NotFindCoinHandler()
+            Log.d("gIsCapturing", "IsCapturing = false")
+
+        } finally {
+
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun NotFindCoinHandler() {
+    private suspend fun NotFindCoinHandler() {
         if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
             NotFindConter += 1
         }
@@ -845,7 +859,7 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun FindNextRoom() {
+    private suspend fun FindNextRoom() {
         MoveNextPage()
     }
 
@@ -876,13 +890,13 @@ class ScreenCaptureService : Service() {
     private suspend fun GetCoinAndQuickRefreshPage () {
         delay(100L)
         PlatformBackGesture()
-        delay(1500L)
+        delay(1000L)
         QuickRefreshPage()
         delay(100L)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun GetCoinButton (x:Float, y:Float) {
+    private suspend fun GetCoinButton (x:Float, y:Float) {
         TouchClick(x, y)
     }
 
@@ -890,13 +904,13 @@ class ScreenCaptureService : Service() {
     private suspend fun QuickRefreshPage () {
         delay(30L)
         MoveNextPage()
-        delay(1600L)
+        delay(1000L)
         MovePreviousPage ()
         delay(50L)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun MovePreviousPage () {
+    private suspend fun MovePreviousPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
         val MoveDistance  = metrics.heightPixels / 2.5f
@@ -905,7 +919,7 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun MoveNextPage () {
+    private suspend fun MoveNextPage () {
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
         val MoveDistance  = metrics.heightPixels / 2.5f
@@ -914,21 +928,48 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun TouchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
+    private suspend fun TouchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine<Unit> { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
+        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                cont.resume(Unit) // 成功完成
+            }
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                cont.resume(Unit) // 或視需求 throw CancellationException()
+            }
+        })
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun TouchRightLeft (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
+    private suspend fun TouchRightLeft (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine<Unit> { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
+        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                cont.resume(Unit) // 成功完成
+            }
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                cont.resume(Unit) // 或視需求 throw CancellationException()
+            }
+        })
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun TouchClick (X: Float, Y: Float) {
+    private suspend fun TouchClick (X: Float, Y: Float) = suspendCancellableCoroutine<Unit> { cont ->
         val ACservice = MyAccessibilityService.instance
-        ACservice?.click(X, Y)
+        ACservice?.click(X, Y , object : AccessibilityService.GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                cont.resume(Unit) // 成功完成
+            }
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                cont.resume(Unit) // 或視需求 throw CancellationException()
+            }
+        })
     }
 
     private fun cleanup() {
