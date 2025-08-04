@@ -933,15 +933,18 @@ class ScreenCaptureService : Service() {
         val result = ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(true) // 成功完成
+                if (cont.isActive)
+                    cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(true)// 或視需求 throw CancellationException()
+                if (cont.isActive)
+                  cont.resume(true)// 或視需求 throw CancellationException()
             }
         })?: false
         if (!result) {
-            cont.resume(false) // 直接 resume false
+            if (cont.isActive)
+              cont.resume(false) // 直接 resume false
         }
     }
 
@@ -951,15 +954,18 @@ class ScreenCaptureService : Service() {
         val result = ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(true) // 成功完成
+                if (cont.isActive)
+                  cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(true) // 或視需求 throw CancellationException()
+                if (cont.isActive)
+                  cont.resume(true) // 或視需求 throw CancellationException()
             }
         })?: false
         if (!result) {
-            cont.resume(false) // 直接 resume false
+            if (cont.isActive)
+              cont.resume(false) // 直接 resume false
         }
     }
 
@@ -969,15 +975,18 @@ class ScreenCaptureService : Service() {
         val result = ACservice?.click(X, Y , object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                cont.resume(true) // 成功完成
+                if (cont.isActive)
+                  cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                cont.resume(true) // 或視需求 throw CancellationException()
+                if (cont.isActive)
+                  cont.resume(true) // 或視需求 throw CancellationException()
             }
         })?: false
         if (!result) {
-            cont.resume(false) // 直接 resume false
+            if (cont.isActive)
+              cont.resume(false) // 直接 resume false
         }
     }
 
