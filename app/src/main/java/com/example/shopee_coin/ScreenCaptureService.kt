@@ -46,7 +46,6 @@ class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
     private val handler = Handler(Looper.getMainLooper())
     private var AdaptiveGetCoinButtonY = 0f
-    private var Adaptive_try_limit = 0
     private val UpscaleRate = 2f
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -156,7 +155,7 @@ class ScreenCaptureService : Service() {
             Log.e("ScreenCapture", "MediaProjection 權限無效")
         }
 
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun setupMediaProjection() {
@@ -477,22 +476,16 @@ class ScreenCaptureService : Service() {
                                     if (AdaptiveGetCoinButtonY == 0f){
                                         AdaptiveGetCoinButtonY = Positon_Y_GetCoinButton
                                     }
-                                    var retry_gap:Float
+                                    val retry_gap = 10f
 
                                     if (CoinButtonLimiter.canCall()) {
                                         //
                                         // Only Adaptive Get Coin Button, triggered twice in 2 mins
                                         //
                                         if (AdaptiveGetCoinButtonY <= Positon_Y_GetCoinButton + Positon_Y_GAP) {
-                                            if (Adaptive_try_limit == 1) {
-                                                retry_gap = 5f
-                                            } else {
-                                                retry_gap = 10f
-                                            }
                                             AdaptiveGetCoinButtonY += retry_gap
                                         } else {
-                                            AdaptiveGetCoinButtonY -= 50f
-                                            Adaptive_try_limit = 1
+                                            AdaptiveGetCoinButtonY -= 80f
                                         }
                                         Log.d("AdaptiveGetCoinButtonY update", "AdaptiveGetCoinButtonY update--> ${AdaptiveGetCoinButtonY}")
                                     }
@@ -991,6 +984,9 @@ class ScreenCaptureService : Service() {
         super.onTaskRemoved(rootIntent)
         stopCaptureLoop()
         mediaProjection?.stop()
+        virtualDisplay?.release()
+        imageReader?.close()
+        mediaProjection?.stop()
         stopSelf()
         Log.d("ScreenCaptureService", "App 被滑掉，服務停止")
     }
@@ -999,6 +995,9 @@ class ScreenCaptureService : Service() {
         super.onDestroy()
         stopCaptureLoop()
         serviceJob.cancel()
+        mediaProjection?.stop()
+        virtualDisplay?.release()
+        imageReader?.close()
         mediaProjection?.stop()
     }
 }
