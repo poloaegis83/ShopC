@@ -5,6 +5,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
@@ -13,6 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.core.content.edit
 import kotlin.math.absoluteValue
 
@@ -22,21 +24,30 @@ class FloatingButtonService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
     private lateinit var button: ImageView
-    @SuppressLint("ClickableViewAccessibility")
+    private lateinit var statusText: TextView
+    private val binder = LocalBinder()
+
+    inner class LocalBinder : Binder() {
+        fun getService(): FloatingButtonService = this@FloatingButtonService
+    }
+
+
+    @SuppressLint("ClickableViewAccessibility", "InflateParams")
     override fun onCreate() {
         super.onCreate()
-
+        val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
+        floatingView = inflater.inflate(R.layout.floating_button, null)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        statusText = floatingView.findViewById(R.id.statusText)
 
-        val widthPx = 120
-        val heightPx = 90
+        //val widthPx = 150
+        //val heightPx = 120
 
         // 載入懸浮按鈕佈局
-        floatingView = LayoutInflater.from(this).inflate(R.layout.floating_button, null)
         button = floatingView.findViewById<ImageView>(R.id.floatingButton)
         val layoutParams = WindowManager.LayoutParams(
-            widthPx,//WindowManager.LayoutParams.WRAP_CONTENT,
-            heightPx,//WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,//widthPx,//WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,//heightPx,//WindowManager.LayoutParams.WRAP_CONTENT,
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -127,5 +138,12 @@ class FloatingButtonService : Service() {
         Log.d("FloatingButtonService", "App 被滑掉，服務停止")
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    // 外部可呼叫此方法更新文字
+    fun updateStatusText(text: String) {
+        statusText.text = text
+    }
+
+    override fun onBind(intent: Intent?): IBinder {
+        return binder
+    }
 }

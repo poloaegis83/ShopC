@@ -1015,8 +1015,6 @@ class ScreenCaptureService : Service() {
         }
     }
 
-
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotification(): Notification {
