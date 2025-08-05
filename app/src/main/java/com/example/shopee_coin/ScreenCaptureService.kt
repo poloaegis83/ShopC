@@ -32,14 +32,13 @@ import com.google.mlkit.vision.text.Text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
-import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -78,9 +77,9 @@ class ScreenCaptureService : Service() {
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
 
-    private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val SingleServiceScope = CoroutineScope(singleThreadDispatcher + serviceJob)
-
+    //private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    //private val SingleServiceScope = CoroutineScope(singleThreadDispatcher + serviceJob)
+    private val SingleServiceScope = CoroutineScope(Dispatchers.Default + serviceJob)
     val metrics = Resources.getSystem().displayMetrics
 
     var IsMLCallback = false
@@ -107,9 +106,9 @@ class ScreenCaptureService : Service() {
 
         fun canCall(): Boolean {
             val now = System.currentTimeMillis()
-            val TwoMinutesMillis = 2 * 60 * 1000  // 2分鐘 = 300,000 毫秒
+            val twoMinutesMillis = 2 * 60 * 1000  // 2分鐘 = 300,000 毫秒
 
-            return if (now - lastCallTime >= TwoMinutesMillis) {
+            return if (now - lastCallTime >= twoMinutesMillis) {
                 lastCallTime = now
                 false
             } else {
@@ -232,7 +231,7 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    private fun AddCoinList(AddValue :Float){
+    /*private fun AddCoinList(AddValue :Float){
         CoinValueList.add(AddValue)
     }
 
@@ -242,7 +241,7 @@ class ScreenCaptureService : Service() {
 
     private fun CleanCoinList(){
         CoinValueList = mutableListOf (0f)
-    }
+    }*/
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun SearchLogic(IsInit: Boolean) {
@@ -322,7 +321,7 @@ class ScreenCaptureService : Service() {
         Log.d("CallBack_Interval", "Normal Mode → Interval: $CallBack_Interval ms")
     }
 
-    private fun StartAndCheckSkip():Boolean {
+    private fun startAndCheckSkip():Boolean {
         if (gIsCapturing) {
             Log.d("gIsCapturing", "gIsCapturing yes")
             return true
@@ -345,7 +344,7 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun captureScreenFrame() {
         Log.d("CoinStates", "$CoinStates")
-        if (StartAndCheckSkip()) {
+        if (startAndCheckSkip()) {
             //imageReader?.acquireLatestImage()?.close()
             gIsCapturing = false
             Log.d("captureScreenFrame", "SKIP")
@@ -371,9 +370,9 @@ class ScreenCaptureService : Service() {
 
         var bitmap: Bitmap? = null
         try {
-            bitmap = GetBitmapFromImage(image)
-            HandleEventCase(bitmap)
-            HandleCoinCase(bitmap)
+            bitmap = getBitmapFromImage(image)
+            handleEventCase(bitmap)
+            handleCoinCase(bitmap)
         } catch (e: Exception) {
             Log.e("processImage", "Error: ${e.message}")
         } finally {
@@ -384,7 +383,7 @@ class ScreenCaptureService : Service() {
         gIsCapturing = false
     }
 
-    private fun GetBitmapFromImage( imageIn: Image):Bitmap{
+    private fun getBitmapFromImage( imageIn: Image):Bitmap{
         val width = Resources.getSystem().displayMetrics.widthPixels
         val height = Resources.getSystem().displayMetrics.heightPixels
 
@@ -399,53 +398,33 @@ class ScreenCaptureService : Service() {
         bitmap.copyPixelsFromBuffer(buffer)
         return bitmap
     }
-    var Y_axis_shift = 0f
+
+
+    private var yAxisShift = 0f
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun HandleEventCase(bitmap: Bitmap) {
+    private suspend fun handleEventCase(bitmap: Bitmap) {
 
         if (Full_refresh_Position_x == 0f && Full_refresh_Position_y == 0f) {
             UpdatePositionForFullFreshPage(bitmap)
         }
 
-        Y_axis_shift = bitmap.height.toFloat() / 4f
+        yAxisShift = bitmap.height.toFloat() / 4f
 
         val cutBitmapHalf = BitmapCropLib.cropToVerticalMiddleTwo (bitmap)
-
-        suspendCancellableCoroutine<Unit> { cont ->
-            TextRecognizerUtil.recognizeTextFromImage(
-                bitmap = cutBitmapHalf,
-                context = this, // activity context
-                onResult = { resultText ->
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            processEventCaseImage(resultText)
-                            cont.resume(Unit)
-                        } catch (e: Exception) {
-                            cont.resumeWithException(e)
-                        } finally {
-                            cutBitmapHalf.recycle()
-                        }
-                    }
-                },
-                onError ={
-                   cont.resumeWithException(it ?: RuntimeException("Unknown OCR Error"))
-                   cutBitmapHalf.recycle()
-                }
-            )
-        }
-
-
         //
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
-        //processEventCaseImage(cutBitmapHalf)
+        recognizeTextAndHandleGesture(cutBitmapHalf, this) { resultText ->
+            processEventCase(resultText)
+        }
+
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    suspend fun processEventCaseImage(resultText: Text) {
+    suspend fun processEventCase(resultText: Text) {
 
-        var Positon_Y_GetCoinButton = 0f
-        var Positon_Y_GAP = 0f
+        var positionYGetCoinButton = 0f
+        var positionYGAP = 0f
 
         val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
         val regex8 = Regex("加活動")
@@ -456,8 +435,8 @@ class ScreenCaptureService : Service() {
         val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
         val regex2 = Regex("[禾未千末朱]獲得寵粉")
         val regex1 = Regex("[直置真][播波插]還可[領领]取")
-        var CoinValueFind = false
-        var CoinValue = 0f
+        var coinValueFind = false
+        var coinValue = 0f
 
         try {
             for (block in resultText.textBlocks) {
@@ -474,30 +453,30 @@ class ScreenCaptureService : Service() {
 
                     Log.d("OCR_Line", "文字內容：${line.text}")
                     //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
-                    if (matches9 != null && !CoinValueFind) {
+                    if (matches9 != null && !coinValueFind) {
                         if (RecordCionLimiter.canCall()){
                             Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
-                            CoinValue = matches9.groups[1]?.value?.toFloat()!!
-                            CoinValueFind = true
-                            Positon_Y_GetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
-                            Log.d("Positon_Y_GetCoinButton", "Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
+                            coinValue = matches9.groups[1]?.value?.toFloat()!!
+                            coinValueFind = true
+                            positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
+                            Log.d("Positon_Y_GetCoinButton", "Positon_Y_GetCoinButton --> ${positionYGetCoinButton}")
                         }
                     }
 
                     if (matches1 != null) {
                         Log.d("RegexMatch", "找到  本場直播還可領取")
-                        if (CoinValueFind && CoinValue != 0f) {
+                        if (coinValueFind && coinValue != 0f) {
                             Log.d("RegexMatch", "ADDD coinClaimStorage")
-                            coinClaimStorage.addClaim(CoinClaim(amount = CoinValue.toDouble()))
-                            CoinValueFind = false
+                            coinClaimStorage.addClaim(CoinClaim(amount = coinValue.toDouble()))
+                            coinValueFind = false
                         }
 
-                        Positon_Y_GAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - Positon_Y_GetCoinButton
+                        positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - positionYGetCoinButton
 
-                        Positon_Y_GetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + Positon_Y_GAP*1.5f + gTotalHeight/4
-                        Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${Positon_Y_GAP}, Positon_Y_GetCoinButton --> ${Positon_Y_GetCoinButton}")
+                        positionYGetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + positionYGAP*1.5f + gTotalHeight/4
+                        Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${positionYGAP}, Positon_Y_GetCoinButton --> ${positionYGetCoinButton}")
                         if (AdaptiveGetCoinButtonY == 0f){
-                            AdaptiveGetCoinButtonY = Positon_Y_GetCoinButton
+                            AdaptiveGetCoinButtonY = positionYGetCoinButton
                         }
                         val retry_gap = 10f
 
@@ -505,7 +484,7 @@ class ScreenCaptureService : Service() {
                             //
                             // Only Adaptive Get Coin Button, triggered twice in 2 mins
                             //
-                            if (AdaptiveGetCoinButtonY <= Positon_Y_GetCoinButton + Positon_Y_GAP) {
+                            if (AdaptiveGetCoinButtonY <= positionYGetCoinButton + positionYGAP) {
                                 AdaptiveGetCoinButtonY += retry_gap
                             } else {
                                 AdaptiveGetCoinButtonY -= 80f
@@ -533,7 +512,7 @@ class ScreenCaptureService : Service() {
                     if (matches7 != null) {
                         val box = line.boundingBox
                         if (box != null) {
-                            TouchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                            TouchClick(box.centerX().toFloat(), box.bottom.toFloat()  + yAxisShift )
                         }
                     }
                 }
@@ -545,42 +524,14 @@ class ScreenCaptureService : Service() {
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun HandleCoinCase(bitmap: Bitmap) {
+    private suspend fun handleCoinCase(bitmap: Bitmap) {
 
-        //val cutBitmap = BitmapCropLib.cropToTopRightQuarter (bitmap)
         val cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
-        //val cutBitmap = BitmapCropLib.cropFinalRegion (bitmap)
-        //cutBitmap = BitmapCropLib.cropToVerticalMiddleTwo(cutBitmap)
-        //cutBitmap = BitmapCropLib.toGrayscale(cutBitmap)
-        //
-        // cutBitmap = BitmapCropLib.toBinary(cutBitmap,200)
-        //cutBitmap = BitmapCropLib.upscaleBitmap(cutBitmap, UpscaleRate.toInt())
 
-        suspendCancellableCoroutine<Unit> { cont ->
-            TextRecognizerUtil.recognizeTextFromImage(
-                bitmap = cutBitmap,
-                context = this, // activity context
-                onResult = { resultText ->
-                    CoroutineScope(Dispatchers.Default).launch {
-                        try {
-                            processCoinCaseImage(resultText)
-                            cont.resume(Unit)
-                        } catch (e: Exception) {
-                            cont.resumeWithException(e)
-                        } finally {
-                            cutBitmap.recycle()
-                        }
-                    }
-                },
-                onError ={
-                    cont.resumeWithException(it ?: RuntimeException("Unknown OCR Error"))
-                    cutBitmap.recycle()
-                }
-            )
+        recognizeTextAndHandleGesture(cutBitmap, this) { resultText ->
+            processCoinCase(resultText)
         }
 
-
-        //processCoinCaseImage(cutBitmap)
     }
 
     private fun last_notZero( Value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
@@ -605,23 +556,21 @@ class ScreenCaptureService : Service() {
 
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
-    suspend fun processCoinCaseImage(resultText: Text) {
+    suspend fun processCoinCase(resultText: Text) {
 
-            val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
-            val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-            val regex3 = Regex("^[領领]取")
-            val regex4 = Regex("^重試")
-            //val regex5 = Regex("已結束")
+        val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
+        val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
+        val regex3 = Regex("^[領领]取")
+        val regex4 = Regex("^重試")
+        //val regex5 = Regex("已結束")
 
-            var Coin_Position_x  = 0f
-            var Coin_Position_y  = 0f
-            var Coin_Position_Height  = 0f
+        var Coin_Position_x  = 0f
+        var Coin_Position_y  = 0f
+        var Coin_Position_Height  = 0f
 
-            CoinStates = CState.SEARCHING_COIN
+        CoinStates = CState.SEARCHING_COIN
 
         try {
-            //Log.d("image.height", "image.height：${image.height}")
-
             OuterReg@ for (block in resultText.textBlocks) {
                 for (line in block.lines) {
                     Log.d("OCR_Line", "文字內容：${line.text}")
@@ -630,8 +579,8 @@ class ScreenCaptureService : Service() {
                     if (matches1 != null  && last_notZero(matches1.value)) {
                         Log.d("RegexMatch", "找到Coin：${matches1.value}")
                         Log.d("OCR_Line", "位置：${line.boundingBox}")
-                        val CoinValue = matches1.value.toFloat()
-                        Log.d("CoinValue", "CoinValue：${CoinValue}")
+                        val coinValue = matches1.value.toFloat()
+                        Log.d("CoinValue", "CoinValue：${coinValue}")
                         //CoinValueShows = 1
                         val boxc = line.boundingBox
                         if (boxc != null) {
@@ -650,7 +599,7 @@ class ScreenCaptureService : Service() {
                             //CoinStates = CState.COIN_VAULE_FIND
                         }
 
-                        if (CoinValue >= CoinValueSatisfy ){
+                        if (coinValue >= CoinValueSatisfy ){
                             Log.d("CoinValue p", "Coin COIN_VAULE_FIND  滿足")
                             CoinStates = CState.COIN_VAULE_FIND
                             NotFindConter = 0
@@ -758,10 +707,8 @@ class ScreenCaptureService : Service() {
 
             GetCoinFreezeHandler()
             NotFindCoinHandler()
-            Log.d("gIsCapturing", "IsCapturing = false")
-
         } finally {
-
+            Log.d("gIsCapturing", "IsCapturing = false")
         }
     }
 
@@ -858,6 +805,38 @@ class ScreenCaptureService : Service() {
 
     }
 
+
+    private suspend fun recognizeTextAndHandleGesture(
+        bitmap: Bitmap,
+        context: Context,
+        textAndGestureHandler: suspend (Text) -> Unit
+    ): String = suspendCancellableCoroutine { cont ->
+        TextRecognizerUtil.recognizeTextFromImage(
+            bitmap = bitmap,
+            context = context,
+            onResult = { resultText ->
+                    try {
+                        runBlocking {
+                            textAndGestureHandler(resultText)
+                        }
+                        if (cont.isActive)
+                          cont.resume("ML PASS")
+                    } catch (e: Exception) {
+                        if (cont.isActive)
+                          cont.resumeWithException(e)
+                    } finally {
+                        bitmap.recycle()
+                    }
+            },
+            onError = { error ->
+                Log.e("OCR_Result", "辨識錯誤：${error.message}")
+                bitmap.recycle()
+                if (cont.isActive)
+                  cont.resumeWithException(error)
+            })
+    }
+
+
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun FindNextRoom() {
         MoveNextPage()
@@ -929,21 +908,25 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun TouchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) = suspendCancellableCoroutine { cont ->
+        Log.d("TouchUpDown", "go")
         val ACservice = MyAccessibilityService.instance
         val result = ACservice?.swipe(X, Y_S , X, Y_E, MoveLong, object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 super.onCompleted(gestureDescription)
-                if (cont.isActive)
+                Log.d("TouchUpDown", "onCompleted")
+                //if (cont.isActive)
                     cont.resume(true) // 成功完成
             }
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 super.onCancelled(gestureDescription)
-                if (cont.isActive)
+                Log.d("TouchUpDown", "onCancelled")
+                //if (cont.isActive)
                   cont.resume(true)// 或視需求 throw CancellationException()
             }
         })?: false
         if (!result) {
-            if (cont.isActive)
+            Log.d("TouchUpDown", "result")
+            //if (cont.isActive)
               cont.resume(false) // 直接 resume false
         }
     }
