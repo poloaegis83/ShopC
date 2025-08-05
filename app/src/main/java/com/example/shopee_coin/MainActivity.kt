@@ -8,9 +8,11 @@ import android.app.TimePickerDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.util.Log
@@ -68,6 +70,17 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
     private lateinit var coinStorage: CoinClaimStorage
+    private var floatingService: FloatingButtonService? = null
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            val localBinder = binder as FloatingButtonService.LocalBinder
+            floatingService = localBinder.getService()
+            floatingService?.updateStatusText("請點開始偵測")
+        }
+        override fun onServiceDisconnected(name: ComponentName) {
+            floatingService = null
+        }
+    }
 
     //@RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -406,10 +419,17 @@ class MainActivity : ComponentActivity() {
 
         // 每次進入前景會重新檢查
         DisposableEffect(lifecycleOwner) {
+
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     val isEnabled = context.isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
-                    text3 = if (isEnabled) " 無障礙服務已啟用✅ " else " 無障礙服務未啟用❌ 請手動打開"
+                     if (isEnabled && MyAccessibilityService.instance != null)
+                         text3 =" 無障礙服務已啟用✅ "
+                     else if (isEnabled)
+                         text3 =" 無障礙服務異常❌ 請重新開關"
+                     else
+                         text3 =" 無障礙服務未啟用❌ 請手動打開"
+
                 }
             }
 
@@ -481,10 +501,10 @@ class MainActivity : ComponentActivity() {
     private fun StartShopeeCoinService(mainActivity: MainActivity) {
         // 由此開始 錄製
         // MediaProjection 的權限 in 另一個 activity
-
         val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         startActivity(intent)
+        floatingService?.updateStatusText("到直播間打開此按鈕")
     }
 
     private fun SetDownValue(DownValue:Float){
@@ -524,7 +544,21 @@ class MainActivity : ComponentActivity() {
         }*/
     }
 
+    override fun onStop() {
+        super.onStop()
+        unbindService(serviceConnection)
+        floatingService = null
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Intent(this, FloatingButtonService::class.java).also { intent ->
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
 }
+
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
