@@ -6,8 +6,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.ServiceInfo
 import android.content.res.Resources
 import android.graphics.Bitmap
@@ -84,6 +86,24 @@ class ScreenCaptureService : Service() {
     var IsMLCallback = false
     private lateinit var coinClaimStorage: CoinClaimStorage
 
+
+    private var floatingService: FloatingButtonService? = null
+    private var isBound = false
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? FloatingButtonService.LocalBinder
+            floatingService = binder?.getService()
+            isBound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            isBound = false
+            floatingService = null
+        }
+    }
+
+
     object RecordCionLimiter {
         private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
 
@@ -120,6 +140,8 @@ class ScreenCaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         coinClaimStorage = CoinClaimStorage(this)  // this 是 context
+        val intent = Intent(this, FloatingButtonService::class.java)
+        bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -242,8 +264,18 @@ class ScreenCaptureService : Service() {
         CoinValueList = mutableListOf (0f)
     }
 */
+
+    fun updateFloatButtonText(text: String) {
+        if (isBound) {
+            floatingService?.updateStatusText(text)
+        } else {
+            Log.w("ScreenCaptureService", "FloatingButtonService 尚未綁定")
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.N)
     private fun SearchLogic(IsInit: Boolean) {
+
         val (T_hour, T_mins) = TimeLib.GetTime()
         var UpValueNow = 0f
         var DownValueNow = 0f
@@ -310,12 +342,14 @@ class ScreenCaptureService : Service() {
                 CallBack_Interval = (CallBack_Interval.toFloat() * 3.01f).toLong()
             }
             Log.d("CallBack_Interval", " Long time ")
+            updateFloatButtonText("等待蝦幣完成")
         } else {
             CallBack_Interval = 4800L
             if(GlobalValueHolder.IsLowEndDevice){
                 CallBack_Interval = (CallBack_Interval.toFloat() * 2.1f).toLong()
             }
             Log.d("CallBack_Interval", " Short Time")
+            updateFloatButtonText("尋找蝦幣中")
         }
         Log.d("CallBack_Interval", "Normal Mode → Interval: $CallBack_Interval ms")
     }
@@ -989,6 +1023,12 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stopCaptureLoop()
+
+        if (isBound) {
+            unbindService(connection)
+            isBound = false
+        }
+
         serviceJob.cancel()
         mediaProjection?.stop()
         virtualDisplay?.release()

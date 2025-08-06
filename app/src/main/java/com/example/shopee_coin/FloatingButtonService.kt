@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -139,10 +141,14 @@ class FloatingButtonService : Service() {
     }
 
     // 外部可呼叫此方法更新文字
+    //fun updateStatusText(text: String) {
+    //    statusText.text = text
+    //}
     fun updateStatusText(text: String) {
-        statusText.text = text
+        Handler(Looper.getMainLooper()).post {
+            statusText.text = text
+        }
     }
-
     override fun onBind(intent: Intent?): IBinder {
         return binder
     }

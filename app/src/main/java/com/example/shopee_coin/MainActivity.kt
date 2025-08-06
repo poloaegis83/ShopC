@@ -412,7 +412,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun AccessibilityStatusScreen(context: Context = LocalContext.current) {
+    fun AccessibilityStatusScreen() {
+        val context = LocalContext.current
         var text3 by remember { mutableStateOf("檢查中...") }
 
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -423,13 +424,14 @@ class MainActivity : ComponentActivity() {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     val isEnabled = context.isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
-                     if (isEnabled && MyAccessibilityService.instance != null)
-                         text3 =" 無障礙服務已啟用✅ "
-                     else if (isEnabled)
-                         text3 =" 無障礙服務異常❌ 請重新開關"
-                     else
-                         text3 =" 無障礙服務未啟用❌ 請手動打開"
-
+                    text3 = when {
+                        isEnabled && MyAccessibilityService.instance != null ->
+                            "無障礙服務已啟用✅"
+                        isEnabled ->
+                            "無障礙服務異常❌ 請重新開關"
+                        else ->
+                            "無障礙服務未啟用❌ 請手動打開"
+                    }
                 }
             }
 
