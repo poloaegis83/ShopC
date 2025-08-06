@@ -525,6 +525,33 @@ class ScreenCaptureService : Service() {
                         }
                     } finally {
                         image.recycle()
+                        //
+                        // ToDo, Added a flag and to told coroutine this ORC callback was down
+                        // remove cont.resume below
+                        // Added antoher flag to Accessibility service on compeled
+                        //
+/*suspend fun waitForAandB() = suspendCoroutine<Unit> { cont ->
+    var aDone = false
+    var bDone = false
+    var resumed = false
+
+    fun tryResume() {
+        if (aDone && bDone && !resumed) {
+            resumed = true
+            cont.resume(Unit)
+        }
+    }
+
+    callbackA {
+        aDone = true
+        tryResume()
+    }
+
+    callbackB {
+        bDone = true
+        tryResume()
+    }
+}*/
                         cont.resume(Unit) // ✅ 確保 coroutine 結束
                     }
                 },
