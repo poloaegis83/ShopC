@@ -47,8 +47,18 @@ class ScreenCapturePermissionActivity : Activity() {
             } else {
                 startService(intent)
             }
+
+            val returnIntent = Intent().apply {
+                putExtra("status", "permission_granted")
+            }
+            setResult(RESULT_OK, returnIntent)
+
         } else {
             Log.w("ScreenCapture", "使用者拒絕或資料為 null")
+            val returnIntent = Intent().apply {
+                putExtra("error", "permission_denied")
+            }
+            setResult(RESULT_CANCELED, returnIntent)
         }
 
         Log.d("ScreenCapture", "啟動前景服務")

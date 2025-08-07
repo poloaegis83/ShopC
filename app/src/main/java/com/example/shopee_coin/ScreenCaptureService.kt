@@ -55,7 +55,7 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var lastCaptureTime = 0L
     val MoveActionMutex = Mutex()
-
+    var isOn = false
     var CallBack_Interval = 5000L
     var NotFindConter = 0
     var SearchCount = 0
@@ -94,6 +94,7 @@ class ScreenCaptureService : Service() {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as? FloatingButtonService.LocalBinder
             floatingService = binder?.getService()
+            Log.d("onServiceConnected", "onServiceConnected  floatingService")
             isBound = true
         }
 
@@ -135,7 +136,6 @@ class ScreenCaptureService : Service() {
             }
         }
     }
-
 
     override fun onCreate() {
         super.onCreate()
@@ -336,6 +336,20 @@ class ScreenCaptureService : Service() {
     }
 
     private fun intervalModifier () {
+
+        if (!MyAccessibilityService.isRunning) {
+            Log.e("updateFloatButtonText", "錯誤:請重開無障礙服務")
+            updateFloatButtonText("❌:請打開(重開)無障礙服務")
+            CallBack_Interval = 6000L
+            return
+        } else {
+            if (!isOn) {
+                updateFloatButtonText("已暫停 點擊打開")
+                Log.d("OCR_Line", "Feature Close")
+                return
+            }
+        }
+
         if (CoinStates == CState.WAITING_COIN) {
             CallBack_Interval = 10000L
             if(GlobalValueHolder.IsLowEndDevice){
@@ -363,7 +377,8 @@ class ScreenCaptureService : Service() {
         }
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        val isOn = prefs.getBoolean("OCR_ENABLED", false)
+        isOn = prefs.getBoolean("OCR_ENABLED", false)
+
         if (isOn) {
             Log.d("OCR_Line", "Feature Open")
         } else {

@@ -423,14 +423,17 @@ class MainActivity : ComponentActivity() {
 
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
+                    val isRunning = MyAccessibilityService.isRunning
+                    Log.d("MyAccessibilityServiceMyAccessibilityService", "isRunning: $isRunning")
                     val isEnabled = context.isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
+                    isEnabledAcService = isEnabled
                     text3 = when {
-                        isEnabled && MyAccessibilityService.instance != null ->
+                        isEnabled && isRunning->
                             "無障礙服務已啟用✅"
-                        isEnabled ->
-                            "無障礙服務異常❌ 請重新開關"
+                        isEnabled && !isRunning ->
+                            "無障礙服務 異常❌ 請重新開關"
                         else ->
-                            "無障礙服務未啟用❌ 請手動打開"
+                            "無障礙服務 未啟用❌ 請手動打開"
                     }
                 }
             }
@@ -505,8 +508,19 @@ class MainActivity : ComponentActivity() {
         // MediaProjection 的權限 in 另一個 activity
         val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-        startActivity(intent)
-        floatingService?.updateStatusText("到直播間打開此按鈕")
+        screenCaptureLauncher.launch(intent)
+    }
+
+
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Toast.makeText(this, "偵測開啟成功", Toast.LENGTH_SHORT).show()
+            floatingService?.updateStatusText("Loading...")
+        } else {
+            Toast.makeText(this, "錯誤:開始偵測失敗，請重新點擊", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun SetDownValue(DownValue:Float){

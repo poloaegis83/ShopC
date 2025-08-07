@@ -2,6 +2,7 @@ package com.example.shopee_coin
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Path
 import android.os.Build
 import android.util.Log
@@ -12,7 +13,8 @@ class MyAccessibilityService : AccessibilityService() {
 
     companion object {
         var instance: MyAccessibilityService? = null
-
+        @Volatile
+        var isRunning = false
         fun performBack() {
             instance?.performGlobalAction(GLOBAL_ACTION_BACK)
                 ?: Log.e("MyAccessibilityService", "Service 尚未啟動，無法執行返回操作")
@@ -37,6 +39,18 @@ class MyAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         Log.w("MyAccessibilityService", "服務被中斷")
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        isRunning = true
+        Log.d("AccessibilityService", "onServiceConnected")
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        isRunning = false
+        Log.d("AccessibilityService", "onUnbind")
+        return super.onUnbind(intent)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

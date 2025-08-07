@@ -17,6 +17,7 @@ object GlobalValueHolder {
     var IsTimeLimit: Boolean = false
 }
 
+var isEnabledAcService = true
 var gHeightOffset: Float = 0.0f
 var gTotalHeight: Float = 0.0f
 
