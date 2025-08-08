@@ -41,6 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +54,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -63,6 +66,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.window.layout.WindowMetricsCalculator
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
 import java.util.Calendar
+import kotlin.math.min
 
 //var isOn: Boolean = false
 
@@ -141,17 +145,17 @@ class MainActivity : ComponentActivity() {
                         //containerColor = Color.White  // 白底
                 ) { innerPadding ->
                     // **新增開始**
+                    LimitFontScale(maxScale = 1.2f) {
+                        Column(modifier = Modifier.padding(innerPadding)) {
+                            Greeting(
+                                name = "蝦霸-蝦幣工具",
+                                modifier = Modifier
+                                .scale(0.8f)
+                            )
 
-                    Column(modifier = Modifier.padding(innerPadding)) {
-                        Greeting(
-                            name = "蝦霸-蝦幣工具",
-                            modifier = Modifier
-                            .scale(0.8f)
-                        )
-
+                        }
+                        SetPageItems()
                     }
-                    SetPageItems()
-
                 }// end of Scaffold
             } // end of Shopee_coinTheme
         }  // end of setContent
@@ -325,6 +329,16 @@ class MainActivity : ComponentActivity() {
                 color = Color.Gray     // 線的顏色
             )
             AccessibilityStatusScreen()
+        }
+    }
+
+    @Composable
+    fun LimitFontScale(maxScale: Float = 1.2f, content: @Composable () -> Unit) {
+        val density = LocalDensity.current
+        CompositionLocalProvider(
+            LocalDensity provides Density(density.density, min(density.fontScale, maxScale))
+        ) {
+            content()
         }
     }
 

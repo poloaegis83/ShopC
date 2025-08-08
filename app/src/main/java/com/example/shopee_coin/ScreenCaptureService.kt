@@ -240,6 +240,7 @@ class ScreenCaptureService : Service() {
     private fun stopCaptureLoop() {
         captureJob?.cancel()
         captureJob = null
+        imageReader?.setOnImageAvailableListener(null, null) // 移除 listener
     }
 
     fun findCurrentStrategy(hour: Int, mins: Int, strategies: List<CoinStrategy>): CoinStrategy? {
@@ -1050,4 +1051,5 @@ class ScreenCaptureService : Service() {
         imageReader?.close()
         mediaProjection?.stop()
     }
+
 }

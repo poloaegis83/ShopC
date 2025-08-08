@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.util.TypedValue.COMPLEX_UNIT_PX
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -146,6 +147,12 @@ class FloatingButtonService : Service() {
     //}
     fun updateStatusText(text: String) {
         Handler(Looper.getMainLooper()).post {
+            // 限制字體大小，不受系統字體過大影響
+            val maxFontScale = 1.2f
+            val fontScale = resources.configuration.fontScale
+            val adjustedSize = statusText.textSize / fontScale * minOf(fontScale, maxFontScale)
+            statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize)
+
             statusText.text = text
         }
     }
