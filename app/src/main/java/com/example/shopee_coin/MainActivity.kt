@@ -24,6 +24,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -55,6 +58,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -174,7 +178,7 @@ class MainActivity : ComponentActivity() {
 
         var text2 by remember { mutableStateOf("") }
 
-        Column(modifier = Modifier.padding(top = 50.dp, start = 1.dp)
+        Column(modifier = Modifier.padding(top = 35.dp, start = 1.dp)
             .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
         ) {
             Row(
@@ -186,19 +190,35 @@ class MainActivity : ComponentActivity() {
             ) {
                 TextField(
                     value = text2,
-                    onValueChange = { text2 = it },
-                    label = { Text("輸入底線值") },
+                    onValueChange = { newValue ->
+                        // 只允許數字與最多一個小數點
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                            text2 = newValue
+                        }
+                    },
+                    label = {
+                        Text(
+                            "自訂底線值",
+                            fontSize = 11.sp // 標籤字體大小
+                        )
+                    },
                     singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                    modifier = Modifier.width(200.dp)
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.width(160.dp)
                 )
                 Button(
                     onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
                 ) {
-                    Text("設定底線值")
+                    Text("自訂底線值",
+                        fontSize = 11.sp // 自訂字體大小
+                    )
                 }
+                Text("自訂值：$text2",
+                    fontSize = 11.sp
+                )
             }
-            Text("自訂底線值：$text2")
+
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
@@ -208,9 +228,15 @@ class MainActivity : ComponentActivity() {
             )
             Button(
                 onClick = { StartShopeeCoinService(this@MainActivity) },
-                modifier = Modifier.width(componentWidth)
+                shape = RoundedCornerShape(12.dp),      // 圓角
+                border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
+                modifier = Modifier
+                    .width(componentWidth)
+                    .height(50.dp)                      // 高度
             ) {
-                Text("按此開始 蝦幣 偵測")
+                Text("按此開始 蝦幣偵測",
+                      fontSize = 16.sp // 字體大小
+                    )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("tips:按蝦幣偵測後 \"懸浮按鈕\"開到ON 才會做動",
@@ -420,7 +446,9 @@ class MainActivity : ComponentActivity() {
                 averageInterval = 0L
                 totalAmount = 0f
             }) {
-                Text("清除紀錄")
+                Text("清除紀錄",
+                    fontSize = 11.sp // 自訂字體大小
+                    )
             }
         }
     }
