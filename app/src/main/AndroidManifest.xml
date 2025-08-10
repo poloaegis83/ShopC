@@ -27,8 +27,8 @@
         </activity>
         <activity
             android:name=".ScreenCapturePermissionActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:exported="true" />
+            android:theme="@style/Theme.Transparent.AppCompat"
+            android:exported="false"/>
 
         <service android:name=".FloatingButtonService"
             android:exported="false"

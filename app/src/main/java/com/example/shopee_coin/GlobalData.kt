@@ -1,10 +1,15 @@
 package com.example.shopee_coin
 
+import android.app.Activity
 import android.content.Intent
 
 object MediaProjectionHolder {
     var resultCode: Int = -1
     var resultData: Intent? = null
+
+    fun hasPermission(): Boolean {
+        return resultCode == Activity.RESULT_OK && resultData != null
+    }
 }
 
 object GlobalValueHolder {

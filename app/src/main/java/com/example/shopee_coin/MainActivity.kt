@@ -4,6 +4,7 @@ package com.example.shopee_coin
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.TimePickerDialog
 import android.content.ComponentName
 import android.content.Context
@@ -24,7 +25,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
@@ -83,7 +85,9 @@ class MainActivity : ComponentActivity() {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             val localBinder = binder as FloatingButtonService.LocalBinder
             floatingService = localBinder.getService()
-            floatingService?.updateStatusText("請點開始偵測")
+            if (!MediaProjectionHolder.hasPermission()) {
+                floatingService?.updateStatusText("請點開始偵測")
+            }
         }
         override fun onServiceDisconnected(name: ComponentName) {
             floatingService = null
@@ -169,6 +173,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("DefaultLocale")
     @Composable
     fun SetPageItems() {
+
         var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
         var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
 
@@ -227,12 +232,27 @@ class MainActivity : ComponentActivity() {
                 color = Color.Gray     // 線的顏色
             )
             Button(
-                onClick = { StartShopeeCoinService(this@MainActivity) },
+                onClick = { startShopeeCoinService() },
                 shape = RoundedCornerShape(12.dp),      // 圓角
-                border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
+                //border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
                 modifier = Modifier
                     .width(componentWidth)
-                    .height(50.dp)                      // 高度
+                    .height(55.dp)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Red,
+                                Color(0xFFFFA500),
+                                Color.Yellow,
+                                Color.Green,
+                                Color.Blue,
+                                Color(0xFF4B0082),
+                                Color(0xFFEE82EE)
+                            )
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(5.dp) // 外框厚度
             ) {
                 Text("按此開始 蝦幣偵測",
                       fontSize = 16.sp // 字體大小
@@ -545,22 +565,36 @@ class MainActivity : ComponentActivity() {
         } == true
     }
 
-    private fun StartShopeeCoinService(mainActivity: MainActivity) {
-        // 由此開始 錄製
-        // MediaProjection 的權限 in 另一個 activity
-        val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-        screenCaptureLauncher.launch(intent)
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        @Suppress("DEPRECATION")
+        for (service in activityManager.getRunningServices(Int.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
 
+    private fun startShopeeCoinService() {
+        //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
+        //if (!serviceRunning) {
+            val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
+            screenCaptureLauncher.launch(intent)
+        //}
+    }
 
     private val screenCaptureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            Toast.makeText(this, "偵測開啟成功", Toast.LENGTH_SHORT).show()
-            floatingService?.updateStatusText("Loading...")
+            val status = result.data?.getStringExtra("status")
+            if (status == "permission_granted") {
+                Toast.makeText(this, "偵測開啟成功", Toast.LENGTH_SHORT).show()
+                floatingService?.updateStatusText("Loading...")
+            }
         } else {
+            floatingService?.updateStatusText("❌請重新點擊")
             Toast.makeText(this, "錯誤:開始偵測失敗，請重新點擊", Toast.LENGTH_SHORT).show()
         }
     }

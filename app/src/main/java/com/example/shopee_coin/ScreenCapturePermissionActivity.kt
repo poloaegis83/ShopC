@@ -1,70 +1,83 @@
 package com.example.shopee_coin
 
-import android.app.Activity
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 
-class ScreenCapturePermissionActivity : Activity() {
+class ScreenCapturePermissionActivity : AppCompatActivity() {
 
-    private lateinit var mediaProjectionManager: MediaProjectionManager   // MediaProjection的權限
+    private lateinit var mediaProjectionManager: MediaProjectionManager
 
+    // 只會在 Android 11+ 使用
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        handlePermissionResult(REQUEST_CODE_CAPTURE, result.resultCode, result.data)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d("shot", "onCreate ScreenCapturePermissionActivity")
 
         mediaProjectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val intent = mediaProjectionManager.createScreenCaptureIntent()
+        val captureIntent = mediaProjectionManager.createScreenCaptureIntent()
 
-        Log.d("shot", "onCreate ScreenCapturePermissionActivity")
-
-        startActivityForResult(intent, 1001)
-
-        //finish()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ 用新版 API
+            screenCaptureLauncher.launch(captureIntent)
+        } else {
+            // Android 10- 用舊版 API
+            startActivityForResult(captureIntent, REQUEST_CODE_CAPTURE)
+        }
     }
 
-
-    //@RequiresApi(Build.VERSION_CODES.O)
+    // Android 10- 會走這裡
+    @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
+        super.onActivityResult(requestCode, resultCode, data)
+        handlePermissionResult(requestCode, resultCode, data)
+    }
+
+    private fun handlePermissionResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_CODE_CAPTURE && resultCode == RESULT_OK && data != null) {
             Log.d("ScreenCapture", "已取得螢幕錄製權限")
+
+            // 保存到靜態變數（避免 Intent 序列化失效）
             MediaProjectionHolder.resultCode = resultCode
             MediaProjectionHolder.resultData = data
-            //Log.d("ScreenCapture", "onActivityResult data is null: ${data == null}, data content: ${data?.toUri(0)}") // 確認data內容
-            // 將授權資料放入 Intent 傳給 Service
-            val intent = Intent(this, ScreenCaptureService::class.java).apply {
+            Log.d("MediaProjectionHolder", "MediaProjectionHolder.resultCode = ${MediaProjectionHolder.resultCode}, MediaProjectionHolder.resultData = ${MediaProjectionHolder.resultData} ")
+            // 啟動前景服務
+            val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
                 putExtra("resultCode", resultCode)
                 putExtra("resultData", data)
             }
-
-
-            // 啟動前景服務（mediaProjection 專用）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
+                startForegroundService(serviceIntent)
             } else {
-                startService(intent)
+                startService(serviceIntent)
             }
 
-            val returnIntent = Intent().apply {
-                putExtra("status", "permission_granted")
-            }
-            setResult(RESULT_OK, returnIntent)
-
+            // 回傳成功狀態給呼叫方
+            setResult(
+                RESULT_OK,
+                Intent().apply { putExtra("status", "permission_granted") }
+            )
         } else {
             Log.w("ScreenCapture", "使用者拒絕或資料為 null")
-            val returnIntent = Intent().apply {
-                putExtra("error", "permission_denied")
-            }
-            setResult(RESULT_CANCELED, returnIntent)
+            setResult(
+                RESULT_CANCELED,
+                Intent().apply { putExtra("error", "permission_denied") }
+            )
         }
-
-        Log.d("ScreenCapture", "啟動前景服務")
 
         finish()
     }
 
-
+    companion object {
+        private const val REQUEST_CODE_CAPTURE = 1001
+    }
 }
