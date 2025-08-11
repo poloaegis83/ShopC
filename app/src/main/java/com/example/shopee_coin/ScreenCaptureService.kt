@@ -104,6 +104,10 @@ class ScreenCaptureService : Service() {
         }
     }
 
+    companion object {
+        @Volatile var isRunning = false
+            private set
+    }
 
     object RecordCionLimiter {
         private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
@@ -168,13 +172,16 @@ class ScreenCaptureService : Service() {
             val mediaProjectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData)
 
-            // TODO: 在這裡啟動 VirtualDisplay 或 imageReader 擷取畫面
-            Log.d("ScreenCapture", "MediaProjection 已啟動")
+            if (!isRunning) {
+                // TODO: 在這裡啟動 VirtualDisplay 或 imageReader 擷取畫面
+                Log.d("ScreenCapture", "MediaProjection 已啟動")
 
-            setupMediaProjection()
-            setupVirtualDisplay()
-            SearchLogic(true)
-            startCaptureLoopNew()
+                setupMediaProjection()
+                setupVirtualDisplay()
+                SearchLogic(true)
+                startCaptureLoopNew()
+                isRunning = true
+            }
         } else {
             Log.e("ScreenCapture", "MediaProjection 權限無效")
         }
@@ -1068,6 +1075,8 @@ class ScreenCaptureService : Service() {
         virtualDisplay?.release()
         imageReader?.close()
         mediaProjection?.stop()
+
+        isRunning = false
     }
 
 }

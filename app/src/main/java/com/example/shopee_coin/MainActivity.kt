@@ -578,8 +578,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startShopCoinService() {
-        val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
-        if (!serviceRunning && !MediaProjectionHolder.hasPermission()) {
+        //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
+        val serviceRunning = ScreenCaptureService.isRunning
+        if (!MediaProjectionHolder.hasPermission()) {
             val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
             screenCaptureLauncher.launch(intent)
         } else if (!serviceRunning && MediaProjectionHolder.hasPermission()) {
@@ -593,7 +594,7 @@ class MainActivity : ComponentActivity() {
                 startService(serviceIntent)
             }
         } else {
-            Toast.makeText(this, "服務已在運行中", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "偵測已在運行", Toast.LENGTH_SHORT).show()
         }
     }
 
