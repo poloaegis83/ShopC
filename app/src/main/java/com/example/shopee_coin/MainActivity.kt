@@ -232,7 +232,7 @@ class MainActivity : ComponentActivity() {
                 color = Color.Gray     // 線的顏色
             )
             Button(
-                onClick = { startShopeeCoinService() },
+                onClick = { startShopCoinService() },
                 shape = RoundedCornerShape(12.dp),      // 圓角
                 //border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
                 modifier = Modifier
@@ -541,6 +541,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("InternalInsetResource")
     fun getNavigationBarHeight(context: Context): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // API 30 以上用 WindowInsets
@@ -557,7 +558,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun Context.isAccessibilityServiceEnabled(serviceClass: Class<out AccessibilityService>): Boolean {
+    private fun Context.isAccessibilityServiceEnabled(serviceClass: Class<out AccessibilityService>): Boolean {
         val expectedComponent = ComponentName(this, serviceClass)
         val enabledServices = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
         return enabledServices?.split(':')?.any {
@@ -576,7 +577,7 @@ class MainActivity : ComponentActivity() {
         return false
     }
 
-    private fun startShopeeCoinService() {
+    private fun startShopCoinService() {
         //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
         //if (!serviceRunning) {
             val intent = Intent(this, ScreenCapturePermissionActivity::class.java)

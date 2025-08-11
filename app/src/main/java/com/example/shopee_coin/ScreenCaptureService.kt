@@ -473,6 +473,9 @@ class ScreenCaptureService : Service() {
         var positionYGetCoinButton = 0f
         var positionYGAP = 0f
 
+
+        val regex11 = Regex("關注|关注")
+        val regex10 = Regex("現在就.?[主王][播波插]")
         val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
         val regex8 = Regex("加活動")
         val regex7 = Regex("^再[試式]一次")
@@ -484,6 +487,7 @@ class ScreenCaptureService : Service() {
         val regex1 = Regex("[直置真][播波插]還可[領领]取")
         var coinValueFind = false
         var coinValue = 0f
+        var findSubscribe = false
 
         try {
             for (block in resultText.textBlocks) {
@@ -497,9 +501,23 @@ class ScreenCaptureService : Service() {
                     val matches7 = regex7.find(line.text)
                     val matches8 = regex8.find(line.text)
                     val matches9 = regex9.find(line.text)
+                    val matches10 = regex10.find(line.text)
+                    val matches11 = regex11.find(line.text)
 
                     Log.d("OCR_Line", "文字內容：${line.text}")
                     //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+
+                    if (matches11 != null && findSubscribe){
+                        line.boundingBox?.let { box ->
+                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                        }
+                        findSubscribe = false
+                    }
+
+                    if (matches10 != null ){
+                        findSubscribe = true
+                    }
+
                     if (matches9 != null && !coinValueFind) {
                         if (RecordCionLimiter.canCall()){
                             Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")

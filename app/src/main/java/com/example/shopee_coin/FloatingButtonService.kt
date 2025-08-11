@@ -108,6 +108,11 @@ class FloatingButtonService : Service() {
 
         // 加入懸浮窗
         windowManager.addView(floatingView, layoutParams)
+
+        // 確保在主執行緒執行字體設定
+        Handler(Looper.getMainLooper()).post {
+            setStatusTextSize()
+        }
     }
 
     //private var isOn = false
@@ -141,18 +146,25 @@ class FloatingButtonService : Service() {
         Log.d("FloatingButtonService", "App 被滑掉，服務停止")
     }
 
-    // 外部可呼叫此方法更新文字
-    //fun updateStatusText(text: String) {
-    //    statusText.text = text
-    //}
-    fun updateStatusText(text: String) {
-        Handler(Looper.getMainLooper()).post {
-            // 限制字體大小，不受系統字體過大影響
-            val maxFontScale = 1.2f
-            val fontScale = resources.configuration.fontScale
-            val adjustedSize = statusText.textSize / fontScale * minOf(fontScale, maxFontScale)
-            statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize)
+    private fun setStatusTextSize() {
+        // 限制字體大小，不受系統字體過大影響
+        val maxFontScale = 1.2f
+        val fontScale = resources.configuration.fontScale
 
+        val scaleLimit = when {
+            fontScale > maxFontScale -> maxFontScale
+            fontScale < 1f -> 1f
+            else -> fontScale
+        }
+        val adjustedSize = statusText.textSize / fontScale * scaleLimit
+        Log.d("setStatusTextSize", "maxFontScale = $maxFontScale, fontScale = $fontScale, adjustedSize = $adjustedSize")
+
+        statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize)
+    }
+
+    fun updateStatusText(text: String) {
+        // 外部可呼叫此方法更新文字
+        Handler(Looper.getMainLooper()).post {
             statusText.text = text
         }
     }
