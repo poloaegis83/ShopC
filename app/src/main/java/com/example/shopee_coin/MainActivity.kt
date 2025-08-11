@@ -578,11 +578,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startShopCoinService() {
-        //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
-        //if (!serviceRunning) {
+        val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
+        if (!serviceRunning && !MediaProjectionHolder.hasPermission()) {
             val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
             screenCaptureLauncher.launch(intent)
-        //}
+        } else if (!serviceRunning && MediaProjectionHolder.hasPermission()) {
+            val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                putExtra("resultCode", MediaProjectionHolder.resultCode)
+                putExtra("resultData", MediaProjectionHolder.resultData)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } else {
+            Toast.makeText(this, "服務已在運行中", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private val screenCaptureLauncher = registerForActivityResult(
