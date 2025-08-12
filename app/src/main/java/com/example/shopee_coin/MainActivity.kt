@@ -29,6 +29,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -234,7 +236,9 @@ class MainActivity : ComponentActivity() {
             )
 
             Row(
-                modifier = Modifier.padding(top = 5.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 5.dp, end = 8.dp),  // 整個 Row 的頂部和右邊距離
                 verticalAlignment = Alignment.CenterVertically
             ){
                 Button(
@@ -266,7 +270,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // 間隔
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 CloseAppButton()
             }
@@ -410,12 +414,24 @@ class MainActivity : ComponentActivity() {
 
             // 如果確定要殺進程（不建議）
             // kotlin.system.exitProcess(0)
-        },
-            shape = RoundedCornerShape(12.dp),      // 圓角
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.DarkGray,
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(5.dp),      // 圓角
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 1.dp),
+            modifier = Modifier.padding(start = 5.dp)
         ) {
-            Text("關閉 App",
-                fontSize = 13.sp // 自訂字體大小
-                )
+            Text(
+                "關閉 App",
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.width(1.dp))
+            Text(
+                "⛔", // 停止符號 Emoji
+                fontSize = 14.sp
+            )
         }
     }
 
