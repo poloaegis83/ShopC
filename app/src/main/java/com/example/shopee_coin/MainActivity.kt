@@ -4,6 +4,7 @@ package com.example.shopee_coin
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.ActivityManager
 import android.app.TimePickerDialog
 import android.content.ComponentName
@@ -231,33 +232,46 @@ class MainActivity : ComponentActivity() {
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
-            Button(
-                onClick = { startShopCoinService() },
-                shape = RoundedCornerShape(12.dp),      // 圓角
-                //border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
-                modifier = Modifier
-                    .width(componentWidth)
-                    .height(55.dp)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.Red,
-                                Color(0xFFFFA500),
-                                Color.Yellow,
-                                Color.Green,
-                                Color.Blue,
-                                Color(0xFF4B0082),
-                                Color(0xFFEE82EE)
-                            )
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+
+            Row(
+                modifier = Modifier.padding(top = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ){
+                Button(
+                    onClick = { startShopCoinService() },
+                    shape = RoundedCornerShape(12.dp),      // 圓角
+                    //border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
+                    modifier = Modifier
+                        .width(componentWidth)
+                        .height(55.dp)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.Red,
+                                    Color(0xFFFFA500),
+                                    Color.Yellow,
+                                    Color.Green,
+                                    Color.Blue,
+                                    Color(0xFF4B0082),
+                                    Color(0xFFEE82EE)
+                                )
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(5.dp) // 外框厚度
+                ) {
+                    Text("按此開始 蝦幣偵測",
+                        fontSize = 17.sp // 字體大小
                     )
-                    .padding(5.dp) // 外框厚度
-            ) {
-                Text("按此開始 蝦幣偵測",
-                      fontSize = 16.sp // 字體大小
-                    )
+                }
+
+                // 間隔
+                Spacer(modifier = Modifier.width(6.dp))
+
+                CloseAppButton()
             }
+
+
             Spacer(modifier = Modifier.height(12.dp))
             Text("tips:按蝦幣偵測後 \"懸浮按鈕\"開到ON 才會做動",
                 fontSize = 14.sp,
@@ -375,6 +389,33 @@ class MainActivity : ComponentActivity() {
                 color = Color.Gray     // 線的顏色
             )
             AccessibilityStatusScreen()
+        }
+    }
+
+    @Composable
+    fun CloseAppButton() {
+        val context = LocalContext.current
+
+        Button(onClick = {
+            val activity = context as? Activity
+
+            // 如果服務正在執行，先停止
+            if (ScreenCaptureService.isRunning) {
+                val svcIntent = Intent(context, ScreenCaptureService::class.java)
+                context.stopService(svcIntent)
+            }
+
+            // 關閉所有 Activity
+            activity?.finishAffinity()
+
+            // 如果確定要殺進程（不建議）
+            // kotlin.system.exitProcess(0)
+        },
+            shape = RoundedCornerShape(12.dp),      // 圓角
+        ) {
+            Text("關閉 App",
+                fontSize = 13.sp // 自訂字體大小
+                )
         }
     }
 

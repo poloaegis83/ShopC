@@ -194,6 +194,7 @@ class ScreenCaptureService : Service() {
             override fun onStop() {
                 super.onStop()
                 Log.d("MediaProjection", "MediaProjection stopped")
+                updateFloatButtonText("❌:請重按 偵測蝦幣")
                 cleanup()  // 釋放資源
                 stopSelf()
             }
@@ -350,12 +351,12 @@ class ScreenCaptureService : Service() {
             updateFloatButtonText("❌:請打開(重開)無障礙服務")
             CallBack_Interval = 6000L
             return
-        } else {
-            if (!isOn) {
-                updateFloatButtonText("已暫停 點擊打開")
-                Log.d("OCR_Line", "Feature Close")
-                return
-            }
+        }
+
+        if (!isOn) {
+            updateFloatButtonText("已暫停 點擊打開")
+            Log.d("OCR_Line", "Feature Close")
+            return
         }
 
         if (CoinStates == CState.WAITING_COIN) {
@@ -1004,6 +1005,10 @@ class ScreenCaptureService : Service() {
     }
 
     private fun cleanup() {
+
+        MediaProjectionHolder.resultCode = -1
+        MediaProjectionHolder.resultData = null
+
         virtualDisplay?.release()
         imageReader?.close()
         mediaProjection = null
