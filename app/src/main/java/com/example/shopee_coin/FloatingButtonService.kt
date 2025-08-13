@@ -32,13 +32,15 @@ class FloatingButtonService : Service() {
     private lateinit var recordText: TextView
     private val binder = LocalBinder()
 
+    val initX = 85
+    val initY = 1130
+
     inner class LocalBinder : Binder() {
         fun getService(): FloatingButtonService = this@FloatingButtonService
     }
 
-    // 加這行
     private val coinClaimStorage: CoinClaimStorage by lazy {
-        CoinClaimStorage(this) // 或你的實作方式
+        CoinClaimStorage(this)
     }
 
     @SuppressLint("ClickableViewAccessibility", "InflateParams")
@@ -48,16 +50,12 @@ class FloatingButtonService : Service() {
         floatingView = inflater.inflate(R.layout.floating_button, null)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         statusText = floatingView.findViewById(R.id.statusText)
-        recordText = floatingView.findViewById<TextView>(R.id.recordText)
+        recordText = floatingView.findViewById(R.id.recordText)
+        button = floatingView.findViewById(R.id.floatingButton)
 
-        //val widthPx = 150
-        //val heightPx = 120
-
-        // 載入懸浮按鈕佈局
-        button = floatingView.findViewById<ImageView>(R.id.floatingButton)
         val layoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,//widthPx,//WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,//heightPx,//WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -68,14 +66,13 @@ class FloatingButtonService : Service() {
         )
 
         layoutParams.gravity = Gravity.TOP or Gravity.START
-        layoutParams.x = 100
-        layoutParams.y = 1100
+        layoutParams.x = initX
+        layoutParams.y = initY
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         prefs.edit { putBoolean("OCR_ENABLED", false) }
 
-        // 拖曳與點擊邏輯
-
+// 拖曳與點擊邏輯
         button.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
@@ -83,6 +80,10 @@ class FloatingButtonService : Service() {
             private var initialTouchY = 0f
 
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
+                val displayMetrics = resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val screenHeight = displayMetrics.heightPixels
+
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         initialX = layoutParams.x
@@ -93,14 +94,40 @@ class FloatingButtonService : Service() {
                     }
 
                     MotionEvent.ACTION_MOVE -> {
-                        layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
-                        layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
+                        var newX = initialX + (event.rawX - initialTouchX).toInt()
+                        var newY = initialY + (event.rawY - initialTouchY).toInt()
+
+                        // 保證不超出螢幕
+                        newX = newX.coerceIn(0, screenWidth - floatingView.width)
+                        newY = newY.coerceIn(0, screenHeight - floatingView.height)
+
+                        layoutParams.x = newX
+                        layoutParams.y = newY
                         windowManager.updateViewLayout(floatingView, layoutParams)
                         return true
                     }
 
                     MotionEvent.ACTION_UP -> {
-                        // 點擊觸發行為
+                        val forbiddenXStart = screenWidth / 2
+                        val forbiddenYEnd = screenHeight / 2.5
+
+                        if (layoutParams.x >= forbiddenXStart && layoutParams.y <= forbiddenYEnd) {
+                            layoutParams.x = initX
+                            layoutParams.y = initY
+                            windowManager.updateViewLayout(floatingView, layoutParams)
+
+                            // 備份原文字
+                            val originalText = statusText.text.toString()
+                            updateStatusText("不要移到右上")
+
+                            // 1 秒後吐回原文字
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                if (statusText.text.toString() == "不要移到右上") {
+                                    updateStatusText(originalText)
+                                }
+                            }, 1000)
+                        }
+
                         if ((event.rawX - initialTouchX).absoluteValue < 10 &&
                             (event.rawY - initialTouchY).absoluteValue < 10
                         ) {
@@ -113,31 +140,20 @@ class FloatingButtonService : Service() {
             }
         })
 
-        // 加入懸浮窗
         windowManager.addView(floatingView, layoutParams)
 
-        // 確保在主執行緒執行字體設定
         Handler(Looper.getMainLooper()).post {
             setTextSize()
         }
     }
 
-    //private var isOn = false
-
     private fun onFloatingButtonClick() {
-
-        // 切換狀態
         IsOn = !IsOn
-
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         prefs.edit { putBoolean("OCR_ENABLED", IsOn) }
         Log.d("Float Button", "Feature FB ${IsOn}")
-        // 根據狀態更換圖片
         val resId = if (IsOn) R.drawable.on_button else R.drawable.off_button
         button.setImageResource(resId)
-
-        // 你可以在這裡控制功能開關，例如啟用 OCR 辨識流程
-        //Toast.makeText(this, "懸浮按鈕被點擊了", Toast.LENGTH_SHORT).show()
     }
 
     override fun onDestroy() {
@@ -154,43 +170,43 @@ class FloatingButtonService : Service() {
     }
 
     private fun setTextSize() {
-        // 限制字體大小，不受系統字體過大影響
         val maxFontScale = 1.2f
         val fontScale = resources.configuration.fontScale
+        val scaleLimit = fontScale.coerceIn(1f, maxFontScale)
 
-        val scaleLimit = when {
-            fontScale > maxFontScale -> maxFontScale
-            fontScale < 1f -> 1f
-            else -> fontScale
-        }
         val adjustedSize1 = statusText.textSize / fontScale * scaleLimit
         val adjustedSize2 = recordText.textSize / fontScale * scaleLimit
-        Log.d("setStatusTextSize", "maxFontScale = $maxFontScale, fontScale = $fontScale, adjustedSize = $adjustedSize1")
 
         statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize1)
         recordText.setTextSize(COMPLEX_UNIT_PX, adjustedSize2)
     }
 
     fun updateStatusText(text: String) {
-        // 外部可呼叫此方法更新文字
         Handler(Looper.getMainLooper()).post {
             statusText.text = text
         }
     }
 
+    fun resetFloatButtonLocation() {
+        if (::floatingView.isInitialized) {
+            val layoutParams = floatingView.layoutParams as WindowManager.LayoutParams
+            // 只有位置不同才更新
+            if (layoutParams.x != initX || layoutParams.y != initY) {
+                layoutParams.x = initX
+                layoutParams.y = initY
+                windowManager.updateViewLayout(floatingView, layoutParams)
+            }
+        }
+    }
+
     @SuppressLint("SetTextI18n")
     fun updateRecordText(times: Int, sum: Float) {
-        // 外部可呼叫此方法更新文字
         Handler(Looper.getMainLooper()).post {
             recordText.text = "${times}次,共:${sum}"
         }
     }
 
     fun updateRecordTextToday() {
-        // 先把最新的 coinClaim 加入 storage
-        // coinClaimStorage.addClaim(...) 可以在這裡做
-
-        // 計算今天統計
         val todayStart = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -201,9 +217,8 @@ class FloatingButtonService : Service() {
         val todayClaims = coinClaimStorage.getClaims().filter { it.timestamp >= todayStart }
         val todayCount = todayClaims.size
         val todayTotal = todayClaims.sumOf { it.amount }.toFloat()
-        // 無條件捨去到小數點一位
         val truncatedTotal = (todayTotal * 10).toInt() / 10f
-        // 更新懸浮按鈕
+
         Handler(Looper.getMainLooper()).post {
             recordText.text = "${todayCount}次, ${truncatedTotal}元"
         }
