@@ -46,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
@@ -79,7 +81,7 @@ import kotlin.math.min
 
 //var isOn: Boolean = false
 
-class MainActivity : ComponentActivity() {
+class MainActivity<ClaimRecord> : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
     private lateinit var coinStorage: CoinClaimStorage
@@ -474,55 +476,94 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun CoinStatsScreen(storage: CoinClaimStorage) {
+        // —— 今日統計狀態 —— //
         var todayCount by remember { mutableStateOf(0) }
         var todayAverage by remember { mutableStateOf(0.0) }
         var averageInterval by remember { mutableStateOf(0L) }
-        var totalAmount by remember { mutableStateOf(0f) }
+        var todayTotal by remember { mutableStateOf(0.0) }
 
+        // —— 過去七天（不含今日） —— //
+        var pastSevenDaily by remember { mutableStateOf<List<Pair<String, Double>>>(emptyList()) }
+        var pastSevenTotal by remember { mutableStateOf(0.0) }
+
+        var showDialog by remember { mutableStateOf(false) }
         val lifecycleOwner = LocalLifecycleOwner.current
 
-        // 每次畫面回到前景時更新統計資料
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    val allClaims = storage.getClaims()
+                    // 取出資料：顯式型別，確保是 List<CoinClaim>
+                    val allClaims: List<CoinClaim> = storage.getClaims()
 
-                    val today = Calendar.getInstance().apply {
+                    // 今天 00:00
+                    val base = Calendar.getInstance().apply {
                         set(Calendar.HOUR_OF_DAY, 0)
                         set(Calendar.MINUTE, 0)
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
+                    }
+                    val todayStart = base.timeInMillis
+
+                    // 7 天前 00:00（不影響 todayStart）
+                    val periodStart = (base.clone() as Calendar).apply {
+                        add(Calendar.DAY_OF_MONTH, -7)
                     }.timeInMillis
 
-                    // 過濾與儲存「今天」的紀錄
-                    val todayClaims = allClaims.filter { it.timestamp >= today }
-                    storage.saveClaims(todayClaims)
+                    // 僅保留最後 8 天（今天 + 前 7 天），刪除更早資料
+                    val recentClaims: List<CoinClaim> =
+                        allClaims.filter { claim: CoinClaim -> claim.timestamp >= periodStart }
+                    storage.saveClaims(recentClaims)
 
-                    // 統計資料
+                    // —— 今日統計 —— //
+                    val todayClaims: List<CoinClaim> =
+                        recentClaims.filter { claim: CoinClaim -> claim.timestamp >= todayStart }
                     todayCount = todayClaims.size
+                    todayTotal = todayClaims.sumOf { it.amount }
                     todayAverage = if (todayClaims.isNotEmpty())
-                        todayClaims.sumOf { it.amount } / todayClaims.size
+                        todayTotal / todayClaims.size
                     else 0.0
 
-                    totalAmount = todayClaims.sumOf { it.amount }.toFloat()
-
+                    // 平均間距（需依時間排序）
                     averageInterval = if (todayClaims.size >= 2) {
-                        val intervals = todayClaims.zipWithNext { a, b -> b.timestamp - a.timestamp }
+                        val sorted = todayClaims.sortedBy { it.timestamp }
+                        val intervals = sorted.zipWithNext { a, b -> b.timestamp - a.timestamp }
                         intervals.sum() / intervals.size
                     } else 0L
+
+                    // —— 過去七天（不含今日）每日總合 —— //
+                    val fmt = java.text.SimpleDateFormat("MM/dd", java.util.Locale.getDefault())
+                    val pastList = mutableListOf<Pair<String, Double>>()
+                    var sevenSum = 0.0
+
+                    for (i in 1..7) {
+                        val dayCal = (base.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -i) }
+                        val dayStart = dayCal.timeInMillis
+                        val dayEnd = (dayCal.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+
+                        val dayTotal = recentClaims
+                            .filter { claim: CoinClaim -> claim.timestamp in dayStart until dayEnd }
+                            .sumOf { it.amount }
+
+                        val label = fmt.format(java.util.Date(dayStart)) // 08/09 這種格式（自帶補零）
+                        pastList += label to dayTotal
+                        sevenSum += dayTotal
+                    }
+
+                    // 昨天在上 → 到 7 天前（由近到遠）
+                    pastSevenDaily = pastList
+                    pastSevenTotal = sevenSum
                 }
             }
 
             lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-            }
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
 
-        // UI 顯示區塊
-        Column(modifier = Modifier.padding(5.dp)) {
+        // —— UI —— //
+        Column(modifier = Modifier.padding(12.dp)) {
+            // 今日統計
             Text(
-                text = "今天領取：$todayCount 次，均：${"%.2f".format(todayAverage)}，合：${"%.2f".format(totalAmount)}",
+                text = "今天領取：$todayCount 次，均：${"%.2f".format(todayAverage)}，合：${"%.2f".format(todayTotal)}",
                 fontSize = 13.sp,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -530,29 +571,68 @@ class MainActivity : ComponentActivity() {
             if (todayCount >= 2) {
                 val minutes = averageInterval / 1000 / 60
                 val seconds = (averageInterval / 1000) % 60
-                Text("平均間距：${minutes}分 ${seconds}秒",
+                Text(
+                    text = "平均間距：${minutes}分 ${seconds}秒",
                     fontSize = 13.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                Text("平均間距：--",
-                    fontSize = 13.sp,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Text("平均間距：--", fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Button(onClick = {
-                storage.clearClaims()
-                todayCount = 0
-                todayAverage = 0.0
-                averageInterval = 0L
-                totalAmount = 0f
-            }) {
-                Text("清除紀錄",
-                    fontSize = 11.sp // 自訂字體大小
-                    )
+            // 查看過去七天（不含今日）
+            Button(onClick = { showDialog = true }) {
+                Text("查看近七天紀錄", fontSize = 11.sp)
+            }
+
+            if (showDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showDialog = false },
+                    title = { Text("今日+過去七天 自動領取紀錄", fontSize = 14.sp) },
+                    text = {
+                        Column {
+                            // 今日
+                            Text("今日 : ${"%.2f".format(todayTotal)}",
+                                fontSize = 12.sp
+                            )
+
+                            // 分割線
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                thickness = 1.dp,
+                                color = Color.Gray
+                            )
+
+                            // 過去七天（不含今日）
+                            if (pastSevenDaily.isEmpty()) {
+                                Text("無資料")
+                            } else {
+                                pastSevenDaily.forEach { (label, total) ->
+                                    Text("$label : ${"%.2f".format(total)}",
+                                        fontSize = 12.sp
+                                        )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                androidx.compose.material3.HorizontalDivider()
+                                Spacer(modifier = Modifier.height(6.dp))
+                                // 七天總和（不包含今日）
+                                Text(
+                                    "過去七天共(不含今日) : ${"%.2f".format(pastSevenTotal)}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showDialog = false }) { Text("關閉") }
+                    }
+                )
             }
         }
     }

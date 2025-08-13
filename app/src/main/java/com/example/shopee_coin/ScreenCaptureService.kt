@@ -96,6 +96,7 @@ class ScreenCaptureService : Service() {
             floatingService = binder?.getService()
             Log.d("onServiceConnected", "onServiceConnected  floatingService")
             isBound = true
+            floatingService?.updateRecordTextToday()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -542,6 +543,8 @@ class ScreenCaptureService : Service() {
                             Log.d("RegexMatch", "ADDD coinClaimStorage")
                             coinClaimStorage.addClaim(CoinClaim(amount = coinValue.toDouble()))
                             coinValueFind = false
+
+                            floatingService?.updateRecordTextToday()
                         }
 
                         positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - positionYGetCoinButton

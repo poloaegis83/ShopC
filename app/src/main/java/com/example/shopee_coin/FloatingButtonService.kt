@@ -19,6 +19,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.edit
+import java.util.Calendar
 import kotlin.math.absoluteValue
 
 var IsOn: Boolean = false
@@ -28,12 +29,17 @@ class FloatingButtonService : Service() {
     private lateinit var floatingView: View
     private lateinit var button: ImageView
     private lateinit var statusText: TextView
+    private lateinit var recordText: TextView
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
         fun getService(): FloatingButtonService = this@FloatingButtonService
     }
 
+    // 加這行
+    private val coinClaimStorage: CoinClaimStorage by lazy {
+        CoinClaimStorage(this) // 或你的實作方式
+    }
 
     @SuppressLint("ClickableViewAccessibility", "InflateParams")
     override fun onCreate() {
@@ -42,6 +48,7 @@ class FloatingButtonService : Service() {
         floatingView = inflater.inflate(R.layout.floating_button, null)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         statusText = floatingView.findViewById(R.id.statusText)
+        recordText = floatingView.findViewById<TextView>(R.id.recordText)
 
         //val widthPx = 150
         //val heightPx = 120
@@ -111,7 +118,7 @@ class FloatingButtonService : Service() {
 
         // 確保在主執行緒執行字體設定
         Handler(Looper.getMainLooper()).post {
-            setStatusTextSize()
+            setTextSize()
         }
     }
 
@@ -146,7 +153,7 @@ class FloatingButtonService : Service() {
         Log.d("FloatingButtonService", "App 被滑掉，服務停止")
     }
 
-    private fun setStatusTextSize() {
+    private fun setTextSize() {
         // 限制字體大小，不受系統字體過大影響
         val maxFontScale = 1.2f
         val fontScale = resources.configuration.fontScale
@@ -156,10 +163,12 @@ class FloatingButtonService : Service() {
             fontScale < 1f -> 1f
             else -> fontScale
         }
-        val adjustedSize = statusText.textSize / fontScale * scaleLimit
-        Log.d("setStatusTextSize", "maxFontScale = $maxFontScale, fontScale = $fontScale, adjustedSize = $adjustedSize")
+        val adjustedSize1 = statusText.textSize / fontScale * scaleLimit
+        val adjustedSize2 = recordText.textSize / fontScale * scaleLimit
+        Log.d("setStatusTextSize", "maxFontScale = $maxFontScale, fontScale = $fontScale, adjustedSize = $adjustedSize1")
 
-        statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize)
+        statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize1)
+        recordText.setTextSize(COMPLEX_UNIT_PX, adjustedSize2)
     }
 
     fun updateStatusText(text: String) {
@@ -168,6 +177,38 @@ class FloatingButtonService : Service() {
             statusText.text = text
         }
     }
+
+    @SuppressLint("SetTextI18n")
+    fun updateRecordText(times: Int, sum: Float) {
+        // 外部可呼叫此方法更新文字
+        Handler(Looper.getMainLooper()).post {
+            recordText.text = "${times}次,共:${sum}"
+        }
+    }
+
+    fun updateRecordTextToday() {
+        // 先把最新的 coinClaim 加入 storage
+        // coinClaimStorage.addClaim(...) 可以在這裡做
+
+        // 計算今天統計
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val todayClaims = coinClaimStorage.getClaims().filter { it.timestamp >= todayStart }
+        val todayCount = todayClaims.size
+        val todayTotal = todayClaims.sumOf { it.amount }.toFloat()
+        // 無條件捨去到小數點一位
+        val truncatedTotal = (todayTotal * 10).toInt() / 10f
+        // 更新懸浮按鈕
+        Handler(Looper.getMainLooper()).post {
+            recordText.text = "${todayCount}次, ${truncatedTotal}元"
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder {
         return binder
     }
