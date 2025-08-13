@@ -179,6 +179,7 @@ class MainActivity : ComponentActivity() {
 
         var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
         var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
+        var advanceSetting by remember { mutableStateOf(false) }
 
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
@@ -189,43 +190,6 @@ class MainActivity : ComponentActivity() {
         Column(modifier = Modifier.padding(top = 35.dp, start = 1.dp)
             .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp) // 元件之間間距
-            ) {
-                TextField(
-                    value = text2,
-                    onValueChange = { newValue ->
-                        // 只允許數字與最多一個小數點
-                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                            text2 = newValue
-                        }
-                    },
-                    label = {
-                        Text(
-                            "自訂底線值",
-                            fontSize = 11.sp // 標籤字體大小
-                        )
-                    },
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.width(160.dp)
-                )
-                Button(
-                    onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
-                ) {
-                    Text("自訂底線值",
-                        fontSize = 11.sp // 自訂字體大小
-                    )
-                }
-                Text("自訂值：$text2",
-                    fontSize = 11.sp
-                )
-            }
 
             HorizontalDivider(
                 modifier = Modifier
@@ -282,24 +246,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth()
                 )
 
-            Row(
-                modifier = Modifier.padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = isLowEndDevice,
-                    onCheckedChange = { checked ->
-                        isLowEndDevice = checked
-                        GlobalValueHolder.IsLowEndDevice = checked
-                    },
-                    //colors = CheckboxDefaults.colors(
-                    //    checkedColor = Color.Black,
-                    //    uncheckedColor = Color.Black
-                    //)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Low-End Device(低階裝置用，變慢)")
-            }
             val initialStartTime = String.format("%02d:%02d", GlobalValueHolder.StartHour, GlobalValueHolder.StartMinute)
             val initialEndTime = String.format("%02d:%02d", GlobalValueHolder.EndHour, GlobalValueHolder.EndMinute)
 
@@ -354,6 +300,21 @@ class MainActivity : ComponentActivity() {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = "啟用 時段內偵測")
+                Spacer(modifier = Modifier.width(8.dp))
+                Checkbox(
+                    checked = advanceSetting,
+                    onCheckedChange = { checked ->
+                        advanceSetting = checked
+                        if (!checked) {
+                            // 進階選項取消勾選時，重置內部狀態
+                            text2 = ""
+                            isLowEndDevice = false
+                            GlobalValueHolder.IsLowEndDevice = false
+                        }
+                    },
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(text = "進階選項")
             }
 
             if (isTimeLimit) {
@@ -392,7 +353,73 @@ class MainActivity : ComponentActivity() {
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
+
             AccessibilityStatusScreen()
+
+            if (advanceSetting) {
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isLowEndDevice,
+                        onCheckedChange = { checked ->
+                            isLowEndDevice = checked
+                            GlobalValueHolder.IsLowEndDevice = checked
+                        },
+                        //colors = CheckboxDefaults.colors(
+                        //    checkedColor = Color.Black,
+                        //    uncheckedColor = Color.Black
+                        //)
+                    )
+                    Spacer(modifier = Modifier.width(1.dp))
+                    Text(text = "Low-End Device(低階裝置用,變慢)",
+                        fontSize = 12.sp // 自訂字體大小
+                    )
+                }
+
+            }
+
+
+            if (advanceSetting) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp) // 元件之間間距
+                ) {
+                    TextField(
+                        value = text2,
+                        onValueChange = { newValue ->
+                            // 只允許數字與最多一個小數點
+                            if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                text2 = newValue
+                            }
+                        },
+                        label = {
+                            Text(
+                                "自訂底線值",
+                                fontSize = 11.sp // 標籤字體大小
+                            )
+                        },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.width(160.dp)
+                    )
+                    Button(
+                        onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
+                    ) {
+                        Text("自訂底線值",
+                            fontSize = 11.sp // 自訂字體大小
+                        )
+                    }
+                    Text("自訂值：$text2",
+                        fontSize = 11.sp
+                    )
+                }
+            }
         }
     }
 
