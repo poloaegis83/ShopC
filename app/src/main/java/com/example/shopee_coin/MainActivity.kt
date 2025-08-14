@@ -26,7 +26,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +68,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -191,14 +194,14 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         var text2 by remember { mutableStateOf("") }
 
-        Column(modifier = Modifier.padding(top = 35.dp, start = 1.dp)
+        Column(modifier = Modifier.padding(top = 10.dp, start = 1.dp)
             .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
         ) {
 
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 8.dp), // 上下間距
+                    .padding(vertical = 6.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
@@ -448,6 +451,57 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     )
                 }
             }
+
+            ImageForMe()
+        }
+    }
+
+
+    @Composable
+    fun ImageForMe() {
+        // 7張圖的 ID
+        val images = listOf(
+            R.drawable.money1,
+            R.drawable.money2,
+            R.drawable.money3,
+            R.drawable.money4,
+            R.drawable.money5,
+            R.drawable.money6,
+            R.drawable.money7,
+            R.drawable.money8,
+            R.drawable.money9,
+            R.drawable.money10,
+            R.drawable.money11
+        )
+
+        // 狀態：剩餘可用圖片池
+        var remainingImages by remember { mutableStateOf(images.shuffled()) }
+        // 狀態：當前圖片
+        var currentImage by remember { mutableStateOf(remainingImages.first()) }
+
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Image(
+                painter = painterResource(id = currentImage),
+                contentDescription = "右下角圖片",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(3.dp)
+                    .size(190.dp)
+                    .clickable {
+                        // 從剩餘池移除當前圖片
+                        remainingImages = remainingImages.drop(1)
+
+                        // 如果剩餘圖片空了 → 重置並重新洗牌
+                        if (remainingImages.isEmpty()) {
+                            remainingImages = images.shuffled()
+                        }
+
+                        // 更新當前圖片
+                        currentImage = remainingImages.first()
+                    }
+            )
         }
     }
 
@@ -653,6 +707,23 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                     fontSize = 12.sp
                                 )
                             }
+
+                            val nonZeroDays = pastSevenDaily.filter { (_, _, count) -> count > 0 }
+
+                            val averageAmount = if (nonZeroDays.isNotEmpty()) {
+                                nonZeroDays.sumOf { (_, amount, _) -> amount } / nonZeroDays.size
+                            } else 0.0
+
+                            val averageCount = if (nonZeroDays.isNotEmpty()) {
+                                nonZeroDays.sumOf { (_, _, count) -> count } / nonZeroDays.size.toDouble()
+                            } else 0.0
+
+                            Text(
+                                "平均(排除0次) : ${"%.2f".format(averageAmount)}/天, ${"%.1f".format(averageCount)}/次/天",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+
                             if (confirmDelete) {
                                 Text(
                                     "真的要清除全部嗎？",
