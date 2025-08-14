@@ -32,7 +32,7 @@ class FloatingButtonService : Service() {
     private lateinit var recordText: TextView
     private val binder = LocalBinder()
 
-    val initX = 85
+    val initX = 60
     val initY = 1130
 
     inner class LocalBinder : Binder() {

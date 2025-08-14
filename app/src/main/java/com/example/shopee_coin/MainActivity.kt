@@ -28,6 +28,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -289,32 +291,49 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = isTimeLimit,
-                    onCheckedChange = { checked ->
-                        isTimeLimit = checked
-                        GlobalValueHolder.IsTimeLimit = checked
-                    },
-                    //colors = CheckboxDefaults.colors(
-                    //    checkedColor = Color.Black,
-                    //    uncheckedColor = Color.Black
-                    //)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                    contentAlignment = Alignment.Center
+                ){
+                    Checkbox(
+                        checked = isTimeLimit,
+                        onCheckedChange = { checked ->
+                            isTimeLimit = checked
+                            GlobalValueHolder.IsTimeLimit = checked
+                        },
+                        //colors = CheckboxDefaults.colors(
+                        //    checkedColor = Color.Black,
+                        //    uncheckedColor = Color.Black
+                        //)
+                    )
+                }
+
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = "啟用 時段內偵測")
                 Spacer(modifier = Modifier.width(8.dp))
-                Checkbox(
-                    checked = advanceSetting,
-                    onCheckedChange = { checked ->
-                        advanceSetting = checked
-                        if (!checked) {
-                            // 進階選項取消勾選時，重置內部狀態
-                            text2 = ""
-                            isLowEndDevice = false
-                            GlobalValueHolder.IsLowEndDevice = false
-                        }
-                    },
-                )
+
+                Box(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                    contentAlignment = Alignment.Center
+                ){
+                    Checkbox(
+                        checked = advanceSetting,
+                        onCheckedChange = { checked ->
+                            advanceSetting = checked
+                            if (!checked) {
+                                // 進階選項取消勾選時，重置內部狀態
+                                text2 = ""
+                                isLowEndDevice = false
+                                GlobalValueHolder.IsLowEndDevice = false
+                            }
+                        },
+                    )
+
+                }
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(text = "進階選項")
             }
@@ -323,9 +342,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 Row(modifier = Modifier.padding(8.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
                         Button(onClick = { timePickerDialogStart.show() }) {
-                            Text("選擇開始時間")
+                            Text("選擇開始時間", fontSize = 11.sp)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(7.dp))
                         Text("開始時間：$selectedTimeStart")
                     }
 
@@ -333,9 +352,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
                     Column(modifier = Modifier.weight(1f)) {
                         Button(onClick = { timePickerDialogEnd.show() }) {
-                            Text("選擇結束時間")
+                            Text("選擇結束時間", fontSize = 11.sp)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(7.dp))
                         Text("結束時間：$selectedTimeEnd")
                     }
                 }
@@ -347,7 +366,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
-            CoinStatsScreen(coinStorage)
+            CoinStatsScreen(coinStorage, advanceSetting)
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
@@ -363,17 +382,24 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     modifier = Modifier.padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = isLowEndDevice,
-                        onCheckedChange = { checked ->
-                            isLowEndDevice = checked
-                            GlobalValueHolder.IsLowEndDevice = checked
-                        },
-                        //colors = CheckboxDefaults.colors(
-                        //    checkedColor = Color.Black,
-                        //    uncheckedColor = Color.Black
-                        //)
-                    )
+                    Box(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                    contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = isLowEndDevice,
+                            onCheckedChange = { checked ->
+                                isLowEndDevice = checked
+                                GlobalValueHolder.IsLowEndDevice = checked
+                            },
+                            //colors = CheckboxDefaults.colors(
+                            //    checkedColor = Color.Black,
+                            //    uncheckedColor = Color.Black
+                            //)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(1.dp))
                     Text(text = "Low-End Device(低階裝置用,變慢)",
                         fontSize = 12.sp // 自訂字體大小
@@ -475,7 +501,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     }
 
     @Composable
-    fun CoinStatsScreen(storage: CoinClaimStorage) {
+    fun CoinStatsScreen(storage: CoinClaimStorage, advanceSetting: Boolean) {
         // —— 今日統計狀態 —— //
         var todayCount by remember { mutableStateOf(0) }
         var todayAverage by remember { mutableStateOf(0.0) }
@@ -483,7 +509,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         var todayTotal by remember { mutableStateOf(0.0) }
 
         // —— 過去七天（不含今日） —— //
-        var pastSevenDaily by remember { mutableStateOf<List<Pair<String, Double>>>(emptyList()) }
+        var pastSevenDaily by remember { mutableStateOf<List<Triple<String, Double, Int>>>(emptyList()) }
         var pastSevenTotal by remember { mutableStateOf(0.0) }
 
         var showDialog by remember { mutableStateOf(false) }
@@ -492,7 +518,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    // 取出資料：顯式型別，確保是 List<CoinClaim>
                     val allClaims: List<CoinClaim> = storage.getClaims()
 
                     // 今天 00:00
@@ -504,35 +529,32 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     }
                     val todayStart = base.timeInMillis
 
-                    // 7 天前 00:00（不影響 todayStart）
+                    // 7 天前 00:00（不含今日）
                     val periodStart = (base.clone() as Calendar).apply {
                         add(Calendar.DAY_OF_MONTH, -7)
                     }.timeInMillis
 
-                    // 僅保留最後 8 天（今天 + 前 7 天），刪除更早資料
+                    // 僅保留最後 8 天（今天 + 前 7 天）
                     val recentClaims: List<CoinClaim> =
-                        allClaims.filter { claim: CoinClaim -> claim.timestamp >= periodStart }
+                        allClaims.filter { it.timestamp >= periodStart }
                     storage.saveClaims(recentClaims)
 
                     // —— 今日統計 —— //
                     val todayClaims: List<CoinClaim> =
-                        recentClaims.filter { claim: CoinClaim -> claim.timestamp >= todayStart }
+                        recentClaims.filter { it.timestamp >= todayStart }
                     todayCount = todayClaims.size
                     todayTotal = todayClaims.sumOf { it.amount }
-                    todayAverage = if (todayClaims.isNotEmpty())
-                        todayTotal / todayClaims.size
-                    else 0.0
+                    todayAverage = if (todayClaims.isNotEmpty()) todayTotal / todayClaims.size else 0.0
 
-                    // 平均間距（需依時間排序）
                     averageInterval = if (todayClaims.size >= 2) {
                         val sorted = todayClaims.sortedBy { it.timestamp }
                         val intervals = sorted.zipWithNext { a, b -> b.timestamp - a.timestamp }
                         intervals.sum() / intervals.size
                     } else 0L
 
-                    // —— 過去七天（不含今日）每日總合 —— //
+                    // —— 過去七天（不含今日）每日總合 + 次數 —— //
                     val fmt = java.text.SimpleDateFormat("MM/dd", java.util.Locale.getDefault())
-                    val pastList = mutableListOf<Pair<String, Double>>()
+                    val pastList = mutableListOf<Triple<String, Double, Int>>()
                     var sevenSum = 0.0
 
                     for (i in 1..7) {
@@ -540,16 +562,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         val dayStart = dayCal.timeInMillis
                         val dayEnd = (dayCal.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
 
-                        val dayTotal = recentClaims
-                            .filter { claim: CoinClaim -> claim.timestamp in dayStart until dayEnd }
-                            .sumOf { it.amount }
+                        val dayClaims = recentClaims.filter { it.timestamp in dayStart until dayEnd }
+                        val dayTotal = dayClaims.sumOf { it.amount }
+                        val dayCount = dayClaims.size.coerceAtMost(100) // 次數上限 100
 
-                        val label = fmt.format(java.util.Date(dayStart)) // 08/09 這種格式（自帶補零）
-                        pastList += label to dayTotal
+                        val label = fmt.format(java.util.Date(dayStart))
+                        pastList += Triple(label, dayTotal, dayCount)
                         sevenSum += dayTotal
                     }
 
-                    // 昨天在上 → 到 7 天前（由近到遠）
                     pastSevenDaily = pastList
                     pastSevenTotal = sevenSum
                 }
@@ -588,17 +609,18 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             }
 
             if (showDialog) {
+                var confirmDelete by remember { mutableStateOf(false) }
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showDialog = false },
                     title = { Text("今日+過去七天 自動領取紀錄", fontSize = 14.sp) },
                     text = {
                         Column {
                             // 今日
-                            Text("今日 : ${"%.2f".format(todayTotal)}",
+                            Text(
+                                "今日 : ${"%.2f".format(todayTotal)}，次數：${todayCount}",
                                 fontSize = 12.sp
                             )
 
-                            // 分割線
                             androidx.compose.material3.HorizontalDivider(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -607,23 +629,34 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 color = Color.Gray
                             )
 
-                            // 過去七天（不含今日）
+                            val pastSevenTotal = pastSevenDaily.sumOf { it.second }  // 總額
+                            val pastSevenTotalCount = pastSevenDaily.sumOf { it.third }  // 總次數
+
+
+                            // 過去七天
                             if (pastSevenDaily.isEmpty()) {
                                 Text("無資料")
                             } else {
-                                pastSevenDaily.forEach { (label, total) ->
-                                    Text("$label : ${"%.2f".format(total)}",
+                                pastSevenDaily.forEach { (label, total, count) ->
+                                    Text(
+                                        "$label : ${"%.2f".format(total)}， ${count}次",
                                         fontSize = 12.sp
-                                        )
+                                    )
                                 }
 
                                 Spacer(modifier = Modifier.height(6.dp))
                                 androidx.compose.material3.HorizontalDivider()
                                 Spacer(modifier = Modifier.height(6.dp))
-                                // 七天總和（不包含今日）
                                 Text(
-                                    "過去七天共(不含今日) : ${"%.2f".format(pastSevenTotal)}",
+                                    "過去七天(不含今日) : ${"%.2f".format(pastSevenTotal)}, 總次數：$pastSevenTotalCount",
                                     fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            if (confirmDelete) {
+                                Text(
+                                    "真的要清除全部嗎？",
+                                    color = Color.Red,
                                     fontSize = 12.sp
                                 )
                             }
@@ -631,7 +664,37 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     },
                     confirmButton = {
                         TextButton(onClick = { showDialog = false }) { Text("關閉") }
-                    }
+                    },
+                    dismissButton = if (advanceSetting) {
+                        {
+                            if (!confirmDelete) {
+                                TextButton(onClick = { confirmDelete = true }) {
+                                    Text("清除全部")
+                                }
+                            } else {
+                                TextButton(onClick = {
+                                    // 重置今日統計
+                                    todayCount = 0
+                                    todayTotal = 0.0
+                                    todayAverage = 0.0
+                                    averageInterval = 0L
+
+                                    // 重置過去七天，但保留日期
+                                    pastSevenDaily = pastSevenDaily.map { (label, _, _) ->
+                                        Triple(label, 0.0, 0)  // 數值清空，日期保留
+                                    }
+                                    pastSevenTotal = 0.0
+
+                                    storage.clearClaims() // 仍可清空儲存的紀錄
+
+                                    //showDialog = false
+                                    confirmDelete = false
+                                }) {
+                                    Text("確定刪除")
+                                }
+                            }
+                        }
+                    } else null
                 )
             }
         }
