@@ -483,17 +483,17 @@ class ScreenCaptureService : Service() {
         var positionYGAP = 0f
 
 
-        val regex11 = Regex("關注|关注")
+        val regex11 = Regex("[關关][注主]")
         val regex10 = Regex("現在就.?[主王][播波插]")
-        val regex9 = Regex("您獲得\\s*([0-9]\\.[0-9]{1,2})\\s*蝦")
-        val regex8 = Regex("加活動")
+        val regex9 = Regex("[您恁你][獲获穫狗][得徳德]\\s*([0-9](?:\\.[0-9]{1,2})?)\\s*[蝦轄遐]")
+        val regex8 = Regex("加[活括][動勁]")
         val regex7 = Regex("^再[試式]一次")
-        val regex6 = Regex("[網罔]路[連蓮]線")
-        val regex5 = Regex("手速搶紅包")
-        val regex4 = Regex("[禾未千末朱]獲得")
+        val regex6 = Regex("[網罔]路[連蓮][線銑絏]")
+        val regex5 = Regex("[手丰]速[搶抢][紅红][包匃]")
+        val regex4 = Regex("[禾未千末朱][獲获穫狗][得徳德]")
         val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
-        val regex2 = Regex("[禾未千末朱]獲得寵粉")
-        val regex1 = Regex("[直置真][播波插]還可[領领]取")
+        val regex2 = Regex("[禾未千末朱][獲获穫狗][得徳德]寵粉")
+        val regex1 = Regex("[直置真][播波插]還可[領领須须後]取")
         var coinValueFind = false
         var coinValue = 0f
         var findSubscribe = false
@@ -532,6 +532,7 @@ class ScreenCaptureService : Service() {
                             Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
                             coinValueFind = true
+                            Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
                             positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
                             Log.d("Positon_Y_GetCoinButton", "positionYGetCoinButton --> ${positionYGetCoinButton}")
                         }
@@ -540,13 +541,12 @@ class ScreenCaptureService : Service() {
                     if (matches1 != null) {
                         Log.d("RegexMatch", "找到  本場直播還可領取")
                         if (coinValueFind && coinValue != 0f) {
-                            Log.d("RegexMatch", "ADDD coinClaimStorage")
+                            Log.d("RegexMatch", "ADDD coinClaimStorage coinValue = ${coinValue}")
                             coinClaimStorage.addClaim(CoinClaim(amount = coinValue.toDouble()))
                             coinValueFind = false
-
                             floatingService?.updateRecordTextToday()
                         }
-
+                        Log.d("line.boundingBox?.bottom?.toFloat()!!", "直播2 ${line.boundingBox?.bottom?.toFloat()!!}")
                         positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - positionYGetCoinButton
 
                         positionYGetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + positionYGAP *1.5f + gTotalHeight/4
@@ -644,8 +644,8 @@ class ScreenCaptureService : Service() {
 
         val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-        val regex3 = Regex("^[領领]取")
-        val regex4 = Regex("^重試")
+        val regex3 = Regex("^[領领須须後]取")
+        val regex4 = Regex("^[重童垂][試拭詩]")
         //val regex5 = Regex("已結束")
 
         var Coin_Position_x  = 0f
