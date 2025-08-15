@@ -528,8 +528,9 @@ class ScreenCaptureService : Service() {
                     }
 
                     if (matches9 != null && !coinValueFind) {
+                        Log.d("RegexMatch9", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                         if (RecordCionLimiter.canCall()){
-                            Log.d("RegexMatch", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
+                            Log.d("RecordCionLimiter", "canCall()")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
                             coinValueFind = true
                             Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
@@ -549,11 +550,19 @@ class ScreenCaptureService : Service() {
                         Log.d("line.boundingBox?.bottom?.toFloat()!!", "直播2 ${line.boundingBox?.bottom?.toFloat()!!}")
                         positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - positionYGetCoinButton
 
+                        if (positionYGetCoinButton == 0f) {
+                            // 如果沒有 matches9 成功就不會有 positionYGAP, 直接給值
+                            positionYGAP = 98f
+                        }
+
                         positionYGetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + positionYGAP *1.5f + gTotalHeight/4
                         Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${positionYGAP }, Positon_Y_GetCoinButton --> ${positionYGetCoinButton}")
-                        if (AdaptiveGetCoinButtonY == 0f){
+                        if (AdaptiveGetCoinButtonY == 0f || AdaptiveGetCoinButtonY >= (metrics.heightPixels - 90).toFloat() ) {
+                            // reset AdaptiveGetCoinButtonY 如果 等於0 或 太大
+                            Log.d("AdaptiveGetCoinButtonY", "reset AdaptiveGetCoinButtonY--> ${positionYGetCoinButton}")
                             AdaptiveGetCoinButtonY = positionYGetCoinButton
                         }
+
                         val retry_gap = 10f
 
                         if (CoinButtonLimiter.canCall()) {
