@@ -194,14 +194,13 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         var text2 by remember { mutableStateOf("") }
 
-        Column(modifier = Modifier.padding(top = 10.dp, start = 1.dp)
+        Column(modifier = Modifier.padding(top = 6.dp, start = 1.dp)
             .graphicsLayer(scaleX = 0.86f, scaleY = 0.8f)
         ) {
-
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 6.dp), // 上下間距
+                    .padding(vertical = 5.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
@@ -365,7 +364,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 8.dp), // 上下間距
+                    .padding(vertical = 6.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
@@ -373,7 +372,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 8.dp), // 上下間距
+                    .padding(vertical = 6.dp), // 上下間距
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
@@ -382,7 +381,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
             if (advanceSetting) {
                 Row(
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -635,7 +634,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
 
         // —— UI —— //
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(8.dp)) {
             // 今日統計
             Text(
                 text = "今天領取：$todayCount 次，均：${"%.2f".format(todayAverage)}，合：${"%.2f".format(todayTotal)}",
@@ -655,10 +654,14 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 Text("平均間距：--", fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             // 查看過去七天（不含今日）
-            Button(onClick = { showDialog = true }) {
+            Button(onClick = { showDialog = true },
+                   contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                   shape = RoundedCornerShape(10.dp),      // 圓角
+                 )
+            {
                 Text("查看近七天紀錄", fontSize = 11.sp)
             }
 
