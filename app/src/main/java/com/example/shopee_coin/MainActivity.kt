@@ -235,7 +235,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         .padding(5.dp) // 外框厚度
                 ) {
                     Text("按此開始 蝦幣偵測",
-                        fontSize = 17.sp // 字體大小
+                        fontSize = 16.sp // 字體大小
                     )
                 }
 
