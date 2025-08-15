@@ -493,7 +493,7 @@ class ScreenCaptureService : Service() {
         val regex4 = Regex("[禾未千末朱][獲获穫狗][得徳德]")
         val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
         val regex2 = Regex("[禾未千末朱][獲获穫狗][得徳德]寵粉")
-        val regex1 = Regex("[直置真][播波插]還可[領领須须後]取")
+        val regex1 = Regex("[直置真][播波插][還這遭]可[領领須须後铁]取")
         var coinValueFind = false
         var coinValue = 0f
         var findSubscribe = false
@@ -644,7 +644,7 @@ class ScreenCaptureService : Service() {
 
         val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-        val regex3 = Regex("^[領领須须後]取")
+        val regex3 = Regex("^[領领須须後铁]取")
         val regex4 = Regex("^[重童垂][試拭詩]")
         //val regex5 = Regex("已結束")
 
