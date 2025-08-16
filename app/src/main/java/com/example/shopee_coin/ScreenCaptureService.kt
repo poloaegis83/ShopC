@@ -533,10 +533,12 @@ class ScreenCaptureService : Service() {
                             Log.d("RecordCionLimiter", "canCall()")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
                             coinValueFind = true
-                            Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
-                            positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
-                            Log.d("Positon_Y_GetCoinButton", "positionYGetCoinButton --> ${positionYGetCoinButton}")
+
                         }
+                        // Always update button location
+                        Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
+                        positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
+                        Log.d("Positon_Y_GetCoinButton", "positionYGetCoinButton --> ${positionYGetCoinButton}")
                     }
 
                     if (matches1 != null) {
@@ -871,7 +873,7 @@ class ScreenCaptureService : Service() {
         Full_refresh_Position_y = 0f
         val cut_image = BitmapCropLib.cropToVerticalTopQuarter(snap_image)
 
-        val regex = Regex("短.{1}音.*?直.{1}")
+        val regex = Regex("短.{1}音.*?[直置真].{1}")
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
