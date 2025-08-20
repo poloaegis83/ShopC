@@ -484,7 +484,7 @@ class ScreenCaptureService : Service() {
 
 
         val regex11 = Regex("[關关][注主]")
-        val regex10 = Regex("現在就.?[主王][播波插]")
+        val regex10 = Regex("現在就.?[主王][播搔波插]")
         val regex9 = Regex("[您恁你][獲获穫狗][得徳德]\\s*([0-9](?:\\.[0-9]{1,2})?)\\s*[蝦轄遐]")
         val regex8 = Regex("加[活括][動勁]")
         val regex7 = Regex("^再[試式]一次")
@@ -493,7 +493,7 @@ class ScreenCaptureService : Service() {
         val regex4 = Regex("[禾未千末朱][獲获穫狗][得徳德]")
         val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
         val regex2 = Regex("[禾未千末朱][獲获穫狗][得徳德]寵粉")
-        val regex1 = Regex("[直置真][播波插][還這遭]可[領领須须後铁]取")
+        val regex1 = Regex("[直置真][播搔波插][還這遭遣]可[領领須须後铁]取")
         var coinValueFind = false
         var coinValue = 0f
         var findSubscribe = false
@@ -713,9 +713,16 @@ class ScreenCaptureService : Service() {
                             if( matches3 != null) {
                                 val boxg = line.boundingBox
                                 if (boxg != null) {
+
+                                    if ( realY(boxg.centerY().toFloat(),2) - Coin_Position_y >= 250f) {
+                                        // 領取與差距Coin_Position_y不對 250
+                                        // 強制給一個 Coin_Position_y
+                                        Coin_Position_y = realY(boxg.centerY().toFloat(),2) - 55f
+                                        Log.d("強制給一個 Coin_Position_y", "領取與差距Coin_Position_y不對 250")
+                                    }
                                     if ( realY(boxg.centerY().toFloat(),2) >= Coin_Position_y) {  //check Get Coin Low Than Value  確保領取是比 coin 數字低
                                         Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
-                                        Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                        Log.d("OCR_Line boxg", "位置centerY：${boxg.centerY().toFloat()}")
                                         CoinStates = CState.GET_COIN_READY
                                         floatingService?.resetFloatButtonLocation()
                                         if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
@@ -738,7 +745,7 @@ class ScreenCaptureService : Service() {
                                         //val timex = boxt.centerX().toFloat()
                                         val timey = realY( boxt.top.toFloat(),2)
                                         Log.d("OCR_Line", "Coin T位置 timey：${timey}")
-                                        if (timey <= Coin_Position_y + Coin_Position_Height*2.7){
+                                        if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f ) {
                                             //
                                             // Check Coin Time 位置
                                             //
