@@ -7,6 +7,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
+import android.util.Log
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.get
 import androidx.core.graphics.scale
@@ -101,6 +102,7 @@ object BitmapCropLib {
     fun cropToTopRightEighth(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
+        Log.d("cropToTopRightEighth", "width：${bitmap.width}  height：${bitmap.height}")
 
         // 先取得右上 1/4 的區域
         val quarterLeft = width / 2

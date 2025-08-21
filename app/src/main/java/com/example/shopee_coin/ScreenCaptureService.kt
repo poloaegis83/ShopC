@@ -232,6 +232,9 @@ class ScreenCaptureService : Service() {
             while (isActive) {
                 if (Counter%10 == 0) {
                     isInExecuteTime = isNowInTimeRangeCheck()
+                    if (!isInExecuteTime){
+                        updateFloatButtonText("⏸\uFE0F未達排程時段")
+                    }
                 }
                 if(isInExecuteTime){
                     captureScreenFrame()
@@ -452,9 +455,14 @@ class ScreenCaptureService : Service() {
         val pixelStride = planes[0].pixelStride
         val rowStride = planes[0].rowStride
         val rowPadding = rowStride - pixelStride * width
-        val bitmap = createBitmap(imageIn.width + rowPadding / pixelStride, imageIn.height, Bitmap.Config.ARGB_8888)
-        bitmap.copyPixelsFromBuffer(buffer)
-        return bitmap
+
+        Log.d("rowPadding", "rowPadding =: ${rowPadding} , pixelStride =: ${pixelStride}, rowPadding / pixelStride = ${rowPadding / pixelStride} ")
+
+        val bitmapWithPadding = createBitmap(imageIn.width + rowPadding / pixelStride, imageIn.height, Bitmap.Config.ARGB_8888)
+        bitmapWithPadding.copyPixelsFromBuffer(buffer)
+        val finalBitmap = createBitmap(bitmapWithPadding, 0, 0, imageIn.width, imageIn.height)
+        bitmapWithPadding.recycle()
+        return finalBitmap
     }
     var Y_axis_shift = 0f
     @RequiresApi(Build.VERSION_CODES.N)
@@ -484,16 +492,16 @@ class ScreenCaptureService : Service() {
 
 
         val regex11 = Regex("[關关][注主]")
-        val regex10 = Regex("現在就.?[主王][播搔波插]")
-        val regex9 = Regex("[您恁你][獲获穫狗][得徳德]\\s*([0-9](?:\\.[0-9]{1,2})?)\\s*[蝦轄遐]")
+        val regex10 = Regex("現在就.?[主王][播搔波插搂]")
+        val regex9 = Regex("[您恁你][獲获攥瓉穫狗猹獠][得徳德陽律很傷]\\s*([0-9](?:\\.[0-9]{1,2})?)\\s*[蝦轄遐]")
         val regex8 = Regex("加[活括][動勁]")
         val regex7 = Regex("^再[試式]一次")
         val regex6 = Regex("[網罔]路[連蓮][線銑絏]")
         val regex5 = Regex("[手丰]速[搶抢][紅红][包匃]")
-        val regex4 = Regex("[禾未千末朱][獲获穫狗][得徳德]")
+        val regex4 = Regex("[禾未千末朱][獲获攥瓉穫狗猹獠][得徳德陽律很傷]")
         val regex3 = Regex("[獎賞][勵歷周].?派[發髮]")
-        val regex2 = Regex("[禾未千末朱][獲获穫狗][得徳德]寵粉")
-        val regex1 = Regex("[直置真][播搔波插][還這遭遣]可[領领須须後铁]取")
+        val regex2 = Regex("[禾未千末朱][獲获攥瓉穫狗猹獠][得徳德陽律很傷]寵粉")
+        val regex1 = Regex("[直置真][播搔波插搂][還這邊遭遣運週]可[領领須须後铁]取")
         var coinValueFind = false
         var coinValue = 0f
         var findSubscribe = false
@@ -686,9 +694,10 @@ class ScreenCaptureService : Service() {
                                     Coin_Position_Height = boxc.height().toFloat()
                                     Log.d("CoinValue", "boxc.bottom：${boxc.bottom} , boxc.top：${boxc.top}, boxc.centerY() ${boxc.centerY()} ,  height: = ${boxc.height()}")
 
-                                    Coin_Position_x += (metrics.widthPixels / 2f)+ (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
+                                    Coin_Position_x += (metrics.widthPixels / 2f) + (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
                                     //Coin_Position_x += (metrics.widthPixels / 2f)
                                     //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
+                                    Log.d("CoinValue p", "(boxc.centerX()).toFloat()：${(boxc.centerX()).toFloat()}  metrics.widthPixels / 2f：${metrics.widthPixels / 2f}")
                                     Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
 
                                     //CoinStates = CState.COIN_VAULE_FIND
@@ -896,7 +905,7 @@ class ScreenCaptureService : Service() {
                             Log.d("OCR_Line", "位置：${line.boundingBox}")
                             val boxc = line.boundingBox
                             if (boxc != null) {
-                                Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/8.5f  // hard code, metrics.widthPixels / 2f
+                                Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/7.8f  // hard code, metrics.widthPixels / 2f
                                 Full_refresh_Position_y = (boxc.centerY()).toFloat()
                                 Log.d("RegexMatch直播", "Full_refresh_Position_x：${Full_refresh_Position_x}, Full_refresh_Position_y：${Full_refresh_Position_y}, w: ${boxc.width()}")
                                 break@OutHere
