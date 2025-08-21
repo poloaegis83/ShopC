@@ -233,7 +233,7 @@ class ScreenCaptureService : Service() {
                 if (Counter%10 == 0) {
                     isInExecuteTime = isNowInTimeRangeCheck()
                     if (!isInExecuteTime){
-                        updateFloatButtonText("⏸\uFE0F未達排程時段")
+                        updateFloatButtonText("⏸\uFE0F未在排程時段中")
                     }
                 }
                 if(isInExecuteTime){

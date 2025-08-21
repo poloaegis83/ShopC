@@ -38,11 +38,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -81,7 +85,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.window.layout.WindowMetricsCalculator
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.math.min
 
 //var isOn: Boolean = false
@@ -458,7 +465,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     @Composable
     fun ImageForMe() {
-        // 7張圖的 ID
+        // 20張圖的 ID
         val images = listOf(
             R.drawable.money1,
             R.drawable.money2,
@@ -470,7 +477,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             R.drawable.money8,
             R.drawable.money9,
             R.drawable.money10,
-            R.drawable.money11
+            R.drawable.money11,
+            R.drawable.money12,
+            R.drawable.money13,
+            R.drawable.money14,
+            R.drawable.money15,
+            R.drawable.money16,
+            R.drawable.money17,
+            R.drawable.money18,
+            R.drawable.money19,
+            R.drawable.money20
         )
 
         // 狀態：剩餘可用圖片池
@@ -560,6 +576,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         var todayAverage by remember { mutableStateOf(0.0) }
         var averageInterval by remember { mutableStateOf(0L) }
         var todayTotal by remember { mutableStateOf(0.0) }
+        var todayClaims by remember { mutableStateOf<List<CoinClaim>>(emptyList()) }
 
         // —— 過去七天（不含今日） —— //
         var pastSevenDaily by remember { mutableStateOf<List<Triple<String, Double, Int>>>(emptyList()) }
@@ -593,14 +610,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     storage.saveClaims(recentClaims)
 
                     // —— 今日統計 —— //
-                    val todayClaims: List<CoinClaim> =
-                        recentClaims.filter { it.timestamp >= todayStart }
-                    todayCount = todayClaims.size
-                    todayTotal = todayClaims.sumOf { it.amount }
-                    todayAverage = if (todayClaims.isNotEmpty()) todayTotal / todayClaims.size else 0.0
+                    val today = recentClaims.filter { it.timestamp >= todayStart }
+                    todayClaims = today   // 把今天的紀錄放進 state
 
-                    averageInterval = if (todayClaims.size >= 2) {
-                        val sorted = todayClaims.sortedBy { it.timestamp }
+                    todayCount = today.size
+                    todayTotal = today.sumOf { it.amount }
+                    todayAverage = if (today.isNotEmpty()) todayTotal / today.size else 0.0
+
+                    averageInterval = if (today.size >= 2) {
+                        val sorted = today.sortedBy { it.timestamp }
                         val intervals = sorted.zipWithNext { a, b -> b.timestamp - a.timestamp }
                         intervals.sum() / intervals.size
                     } else 0L
@@ -655,15 +673,35 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             }
 
             Spacer(modifier = Modifier.height(3.dp))
+            var showDetailDialog by remember { mutableStateOf(false) }
 
-            // 查看過去七天（不含今日）
-            Button(onClick = { showDialog = true },
-                   contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
-                   shape = RoundedCornerShape(10.dp),      // 圓角
-                 )
-            {
-                Text("查看近七天紀錄", fontSize = 11.sp)
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ){
+                // 查看過去七天（不含今日）
+                Button(onClick = { showDialog = true },
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(10.dp),      // 圓角
+                )
+                {
+                    Text("查看近七天紀錄", fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Button(onClick = { showDetailDialog = true },
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(10.dp),      // 圓角
+                ) {
+                    Text("查看今日明細", fontSize = 11.sp)
+                }
+
             }
+
+            TodayClaimDetailDialog(
+                showDialog = showDetailDialog,
+                onDismiss = { showDetailDialog = false },
+                todayClaims = todayClaims // 這裡你傳入 List<Triple<序號, coin數值, 時間戳ms>>
+            )
 
             if (showDialog) {
                 var confirmDelete by remember { mutableStateOf(false) }
@@ -771,6 +809,59 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     } else null
                 )
             }
+        }
+    }
+
+
+    @Composable
+    fun TodayClaimDetailDialog(
+        showDialog: Boolean,
+        onDismiss: () -> Unit,
+        todayClaims: List<CoinClaim>
+    ) {
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("今日領取明細", fontSize = 14.sp) },
+                text = {
+                    Column {
+                        Row(Modifier.fillMaxWidth()) {
+                            Text("排序", modifier = Modifier.weight(0.2f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("蝦幣", modifier = Modifier.weight(0.3f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("時間", modifier = Modifier.weight(0.5f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("與上一筆時差", modifier = Modifier.weight(0.6f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
+                        HorizontalDivider()
+
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 300.dp)
+                        ) {
+                            itemsIndexed(todayClaims.sortedBy { it.timestamp }) { index, claim ->
+                                val timeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(claim.timestamp))
+
+                                val diffString = if (index == 0) "----" else {
+                                    val diffMs = claim.timestamp - todayClaims[index - 1].timestamp
+                                    val diffSec = diffMs / 1000
+                                    val minutes = diffSec / 60
+                                    val seconds = diffSec % 60
+                                    "${minutes}′${seconds.toString().padStart(2, '0')}″"
+                                }
+
+                                Row(Modifier.fillMaxWidth()) {
+                                    Text("${index + 1}", modifier = Modifier.weight(0.2f), fontSize = 12.sp)
+                                    Text("%.2f".format(claim.amount), modifier = Modifier.weight(0.3f), fontSize = 12.sp)
+                                    Text(timeString, modifier = Modifier.weight(0.5f), fontSize = 12.sp)
+                                    Text(diffString, modifier = Modifier.weight(0.6f), fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = onDismiss) { Text("關閉") }
+                }
+            )
         }
     }
 
