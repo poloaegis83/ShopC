@@ -17,8 +17,8 @@ object GlobalValueHolder {
     var IsLowEndDevice: Boolean = false
     var StartHour: Int = 8
     var StartMinute: Int = 30
-    var EndHour: Int = 23
-    var EndMinute: Int = 30
+    var EndHour: Int = 0
+    var EndMinute: Int = 0
     var IsTimeLimit: Boolean = false
 }
 
