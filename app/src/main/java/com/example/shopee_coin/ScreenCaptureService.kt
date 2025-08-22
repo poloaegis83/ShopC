@@ -232,9 +232,6 @@ class ScreenCaptureService : Service() {
             while (isActive) {
                 if (Counter%10 == 0) {
                     isInExecuteTime = isNowInTimeRangeCheck()
-                    if (!isInExecuteTime){
-                        updateFloatButtonText("⏸\uFE0F未在排程時段中")
-                    }
                 }
                 if(isInExecuteTime){
                     captureScreenFrame()
@@ -242,6 +239,7 @@ class ScreenCaptureService : Service() {
                     delay(CallBack_Interval)
                 } else {
                     // 不在執行時間，睡個較長時間減輕 CPU 負擔
+                    updateFloatButtonText("⏸\uFE0F未在排程時段中")
                     delay(6000L) // 6秒，根據需求調整
                 }
                 Counter = (Counter + 1) % 10
