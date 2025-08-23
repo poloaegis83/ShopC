@@ -19,6 +19,19 @@ class MyAccessibilityService : AccessibilityService() {
             instance?.performGlobalAction(GLOBAL_ACTION_BACK)
                 ?: Log.e("MyAccessibilityService", "Service 尚未啟動，無法執行返回操作")
         }
+
+        // 紀錄目前前景的 App
+        @Volatile
+        var currentForegroundApp: String? = null
+
+        private const val TARGET_APP = "com.shopee.tw"   // 預期的 App (hardcode)
+
+        // 對外提供檢查 API
+        fun checkForegroundApp(): Boolean {
+            Log.d("MyAccessibilityService", "currentForegroundApp = $currentForegroundApp")
+            return currentForegroundApp == TARGET_APP
+        }
+
     }
 
     override fun onCreate() {
@@ -33,9 +46,9 @@ class MyAccessibilityService : AccessibilityService() {
         Log.d("MyAccessibilityService", "服務已停止")
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    //override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // 這裡可略過或根據需要處理事件
-    }
+    //}
 
     override fun onInterrupt() {
         Log.w("MyAccessibilityService", "服務被中斷")
@@ -83,5 +96,18 @@ class MyAccessibilityService : AccessibilityService() {
             Log.e("MyAccessibilityService", "點擊手勢失敗")
         }
     }
+
+  //com.shopee.tw
+  override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+      if (event == null) return
+
+      if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+          val pkg = event.packageName?.toString()
+          if (!pkg.isNullOrEmpty()) {
+              currentForegroundApp = pkg
+              Log.d("MyAccessibilityService", "Foreground changed = $pkg")
+          }
+      }
+  }
 
 }

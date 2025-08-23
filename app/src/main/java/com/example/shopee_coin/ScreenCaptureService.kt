@@ -63,6 +63,8 @@ class ScreenCaptureService : Service() {
     var Full_refresh_Position_x  = 0f
     var Full_refresh_Position_y  = 0f
 
+    var isDuringRestart = false
+
     var GetCoinFreezeCount = 0
 
     var CoinStates = CState.COIN_START
@@ -108,6 +110,23 @@ class ScreenCaptureService : Service() {
     companion object {
         @Volatile var isRunning = false
             private set
+    }
+
+
+    object AppShopCheckerLimiter {
+        private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
+
+        fun canCall(): Boolean {
+            val now = System.currentTimeMillis()
+            val Millis = 2 * 60 * 1000  //  2 mins
+
+            return if (now - lastCallTime >= Millis) {
+                lastCallTime = now
+                true
+            } else {
+                false
+            }
+        }
     }
 
     object RecordCionLimiter {
@@ -284,8 +303,40 @@ class ScreenCaptureService : Service() {
         }
     }
 
+
+    @SuppressLint("QueryPermissionsNeeded")
+    fun reopenShopeeApp(context: Context) {
+        val pm = context.packageManager
+        var launchIntent = pm.getLaunchIntentForPackage("com.shopee.tw")
+
+        if (launchIntent == null) {
+            // fallback: 查找 Main + Launcher Activity
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                `package` = "com.shopee.tw"
+            }
+            val resolveList = pm.queryIntentActivities(intent, 0)
+            if (resolveList.isNotEmpty()) {
+                val activityInfo = resolveList[0].activityInfo
+                launchIntent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    component = ComponentName(activityInfo.packageName, activityInfo.name)
+                }
+            }
+        }
+        //Log.e("Shopee", "找不到可啟動的 Activity")
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+        } else {
+            Log.e("Shopee", "找不到可啟動的 Activity")
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.N)
     private fun SearchLogic(IsInit: Boolean) {
+
+        Log.d("checkForegroundApp()", "：${MyAccessibilityService.checkForegroundApp()}")
 
         val (T_hour, T_mins) = TimeLib.GetTime()
         var UpValueNow = 0f
@@ -296,8 +347,8 @@ class ScreenCaptureService : Service() {
 
         if (currentTStrategy != null) {
             Log.d("CoinStrategy", "目前時段策略：$currentTStrategy")
-            UpValueNow    = currentTStrategy.PeriodUpValue
-            DownValueNow  = currentTStrategy.PeriodDownValue
+            UpValueNow = currentTStrategy.PeriodUpValue
+            DownValueNow = currentTStrategy.PeriodDownValue
             MinusValueNow = currentTStrategy.CoinValueMinus
             RefreshCountNow = currentTStrategy.RefreshCount
         } else {
@@ -319,7 +370,7 @@ class ScreenCaptureService : Service() {
             if (CoinStates == CState.NOT_FIND_DOING_FRESH) {
                 Log.d("SearchLogic", "CState.PAGE_COIN_NOT_FIND SearchCount += 1")
                 SearchCount += 1
-            } else if (CoinStates == CState.WAITING_COIN || CoinStates == CState.GET_COIN_READY){
+            } else if (CoinStates == CState.WAITING_COIN || CoinStates == CState.GET_COIN_READY) {
                 SearchCount = 0
             }
             if (CoinStates == CState.WAITING_COIN) {
@@ -342,6 +393,35 @@ class ScreenCaptureService : Service() {
                         FullFreshPage()
                     }
                 }
+            }
+        }
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    suspend fun appCheckRestart(){
+        if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning) {
+            if(!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) {
+              reopenShopeeApp(this)
+              isDuringRestart = true
+                Log.d("appCheckRestart", "reopenShopeeApp")
+                delay(10000L)
+              while(MyAccessibilityService.checkForegroundApp()) {
+                  Log.d("appCheckRestart", "performBack()")
+                  MyAccessibilityService.performBack()
+                  delay(1600L)
+              }
+              //MyAccessibilityService.performBack()
+              delay(2000L)
+                Log.d("appCheckRestart", "reopenShopeeApp2")
+              reopenShopeeApp(this)
+              delay(10000L)
+              touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
+              delay(10000L)
+              moveLeftPage()
+              delay(5000L)
+              FindNextRoom()
+              isDuringRestart = false
             }
         }
     }
@@ -380,6 +460,11 @@ class ScreenCaptureService : Service() {
     }
 
     private fun StartAndCheckSkip():Boolean {
+
+        if (isDuringRestart) {
+            return true
+        }
+
         if (gIsCapturing) {
             Log.d("gIsCapturing", "gIsCapturing yes")
             return true
@@ -409,6 +494,9 @@ class ScreenCaptureService : Service() {
             Log.d("captureScreenFrame", "SKIP")
             return
         }
+
+        appCheckRestart()
+
         SearchLogic(false)
 
         Log.d("captureScreenFrame", "GO")
@@ -1016,15 +1104,25 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
+    private fun moveLeftPage () {
+        val screenX = metrics.widthPixels / 4f
+        val screenCenterY = metrics.heightPixels / 2f
+        val MoveDistance  = metrics.widthPixels / 1.8f
+        Log.d("moveLeftPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
+        touchRightLeft(screenX,screenX + MoveDistance, screenCenterY, 900)
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun touchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
         val ACservice = MyAccessibilityService.instance
         ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun touchRightLeft (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
+    private fun touchRightLeft (X_S: Float, X_E: Float, Y: Float, MoveLong: Long) {
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
+        ACservice?.swipe(X_S, Y , X_E, Y, MoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

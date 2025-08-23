@@ -20,6 +20,7 @@ object GlobalValueHolder {
     var EndHour: Int = 0
     var EndMinute: Int = 0
     var IsTimeLimit: Boolean = false
+    var appCheckRestartFeature = false
 }
 
 var isEnabledAcService = true

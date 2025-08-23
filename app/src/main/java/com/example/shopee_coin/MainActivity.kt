@@ -192,6 +192,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     fun SetPageItems() {
 
         var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
+        var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
         var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
         var advanceSetting by remember { mutableStateOf(false) }
 
@@ -337,7 +338,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 // 進階選項取消勾選時，重置內部狀態
                                 text2 = ""
                                 isLowEndDevice = false
+                                appCheckRestartFeature = false
                                 GlobalValueHolder.IsLowEndDevice = false
+                                GlobalValueHolder.appCheckRestartFeature = false
                             }
                         },
                     )
@@ -410,9 +413,33 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         )
                     }
                     Spacer(modifier = Modifier.width(1.dp))
-                    Text(text = "Low-End Device(低階裝置用,變慢)",
+                    Text(text = "Low-End Device(低階裝置用)",
                         fontSize = 12.sp // 自訂字體大小
                     )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = appCheckRestartFeature,
+                            onCheckedChange = { checked ->
+                                appCheckRestartFeature = checked
+                                GlobalValueHolder.appCheckRestartFeature = checked
+                            },
+                            //colors = CheckboxDefaults.colors(
+                            //    checkedColor = Color.Black,
+                            //    uncheckedColor = Color.Black
+                            //)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(1.dp))
+                    Text(text = "自動重啟",
+                        fontSize = 12.sp // 自訂字體大小
+                    )
+
                 }
 
             }

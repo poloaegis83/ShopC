@@ -4,6 +4,19 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+
+    <!-- Android 11+ 必須的 queries，用於 PackageManager 查詢 -->
+    <queries>
+        <!-- 指定可能會查詢的 App package -->
+        <package android:name="com.shopee.tw" />
+        <!-- 若要查詢所有 Launcher App，可加下面這個 -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
