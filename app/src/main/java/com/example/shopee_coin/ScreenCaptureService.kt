@@ -369,9 +369,9 @@ class ScreenCaptureService : Service() {
             Log.d("CallBack_Interval", " Long time ")
             updateFloatButtonText("等待蝦幣完成")
         } else {
-            CallBack_Interval = 4800L
+            CallBack_Interval = 5500L
             if(GlobalValueHolder.IsLowEndDevice){
-                CallBack_Interval = (CallBack_Interval.toFloat() * 2.1f).toLong()
+                CallBack_Interval = (CallBack_Interval.toFloat() * 2f).toLong()
             }
             Log.d("CallBack_Interval", " Short Time")
             updateFloatButtonText("尋找蝦幣中")
@@ -830,7 +830,7 @@ class ScreenCaptureService : Service() {
         if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
             NotFindConter += 1
         }
-        if (NotFindConter > 2){
+        if (NotFindConter >= 2){
             Log.d("move", "MoveNextPage")
             CoinStates = CState.NOT_FIND_DOING_FRESH
             //AddCoinList(CoinValueToRecord)
@@ -959,8 +959,8 @@ class ScreenCaptureService : Service() {
             serviceScope.launch {
                 delay(200L)
                 touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
-                //delay(1100L)
-                //touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
+                delay(500L)
+                touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
                 delay(1000L)
                 moveNextPage()
                 delay(300L)

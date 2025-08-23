@@ -52,5 +52,5 @@ val DefaultStrategies = listOf(
     //傍晚
     CoinStrategy(17, 40, 19, 30, 0.3f, 0.2f, 0.05f,5),
     //晚上
-    CoinStrategy(19, 30, 23, 0, 0.4f, 0.3f, 0.1f,5),
+    CoinStrategy(19, 30, 23, 59, 0.4f, 0.3f, 0.1f,5),
 )
