@@ -22,6 +22,7 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -183,6 +184,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     }
                 }// end of Scaffold
             } // end of Shopee_coinTheme
+
+            DoubleBackToExitApp()
         }  // end of setContent
 
     }
@@ -930,6 +933,23 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             modifier = Modifier.padding(top = 12.dp),
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
         )
+    }
+
+    @Composable
+    fun DoubleBackToExitApp() {
+        var lastBackPressedTime by remember { mutableStateOf(0L) }
+        val exitInterval = 2000L
+        val context = LocalContext.current
+
+        BackHandler {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastBackPressedTime < exitInterval) {
+                (context as? Activity)?.finish() // 直接結束 Activity
+            } else {
+                lastBackPressedTime = currentTime
+                Toast.makeText(context, "再按一次返回鍵退出", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     @SuppressLint("ServiceCast")
