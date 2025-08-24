@@ -69,6 +69,9 @@ class ScreenCaptureService : Service() {
 
     var CoinStates = CState.COIN_START
 
+    var checkLiveStreamingPage_retry_count = 0
+    var notInLiveStreamingPage_reopen_request = false
+
     //val CoinClaimStorage = CoinClaimStorage(this)
 
     enum class CState {
@@ -110,6 +113,23 @@ class ScreenCaptureService : Service() {
     companion object {
         @Volatile var isRunning = false
             private set
+    }
+
+
+    object CheckInLiveStreamLimiter {
+        private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
+
+        fun canCall(): Boolean {
+            val now = System.currentTimeMillis()
+            val Millis = 30 * 1000  // 30 秒
+
+            return if (now - lastCallTime >= Millis) {
+                lastCallTime = now
+                true
+            } else {
+                false
+            }
+        }
     }
 
 
@@ -401,27 +421,29 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     suspend fun appCheckRestart(){
         if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning) {
-            if(!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) {
-              reopenShopeeApp(this)
-              isDuringRestart = true
+            if( (!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) || notInLiveStreamingPage_reopen_request ) {
+                updateFloatButtonText("嘗試重啟蝦皮，勿動做")
+                reopenShopeeApp(this)
+                isDuringRestart = true
                 Log.d("appCheckRestart", "reopenShopeeApp")
                 delay(10000L)
-              while(MyAccessibilityService.checkForegroundApp()) {
+                while(MyAccessibilityService.checkForegroundApp()) {
                   Log.d("appCheckRestart", "performBack()")
                   MyAccessibilityService.performBack()
                   delay(1600L)
-              }
-              MyAccessibilityService.performHome()
-              delay(2000L)
+                }
+                MyAccessibilityService.performHome()
+                updateFloatButtonText("重啟蝦皮，勿動螢幕")
+                delay(3000L)
                 Log.d("appCheckRestart", "reopenShopeeApp2")
-              reopenShopeeApp(this)
-              delay(10000L)
-              touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
-              delay(10000L)
-              moveLeftPage()
-              delay(5000L)
-              FindNextRoom()
-              isDuringRestart = false
+                reopenShopeeApp(this)
+                delay(12000L)
+                touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
+                delay(12000L)
+                moveLeftPage()
+                delay(6000L)
+                FindNextRoom()
+                isDuringRestart = false
             }
         }
     }
@@ -518,6 +540,7 @@ class ScreenCaptureService : Service() {
         var bitmap: Bitmap? = null
         try {
             bitmap = getBitmapFromImage(image)
+            checkInLiveStreamingPage(bitmap)
             HandleEventCase(bitmap)
             HandleCoinCase(bitmap)
         } catch (e: Exception) {
@@ -569,7 +592,6 @@ class ScreenCaptureService : Service() {
         recognizeTextAndHandleGesture(cutBitmapHalf, this) { resultText ->
             processEventCase(resultText)
         }
-
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -785,7 +807,6 @@ class ScreenCaptureService : Service() {
                                     //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
                                     Log.d("CoinValue p", "(boxc.centerX()).toFloat()：${(boxc.centerX()).toFloat()}  metrics.widthPixels / 2f：${metrics.widthPixels / 2f}")
                                     Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
-
                                     //CoinStates = CState.COIN_VAULE_FIND
                                 }
 
@@ -871,6 +892,8 @@ class ScreenCaptureService : Service() {
                                     }
                                     gFindCoinButNoTime = 0
                                     CoinStates = CState.SEARCHING_COIN
+
+                                    checkLiveStreamingPage_retry_count = 0
                                     break@OuterReg
                                 }
                             }
@@ -968,39 +991,139 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
-    private fun UpdatePositionForFullFreshPage(snap_image: Bitmap) {
-        Full_refresh_Position_x = 0f
-        Full_refresh_Position_y = 0f
-        val cut_image = BitmapCropLib.cropToVerticalTopQuarter(snap_image)
 
-        val regex = Regex("短.{1}音.*?[直置真].{1}")
+    private fun checkInLiveStreamingPage(snap_image: Bitmap) {
+        Log.d("checkInLiveStreamingPage", "checkInLiveStreamingPage")
+        if (!GlobalValueHolder.appCheckRestartFeature || !MyAccessibilityService.isRunning) {
+           return
+        }
+        if (!CheckInLiveStreamLimiter.canCall()) {
+            return
+        }
+
+        Log.d("checkInLiveStreamingPage", ".canCall()")
+
+        val cut_image = BitmapCropLib.cropToVerticalTopQuarter(snap_image)
+        val regex = Regex("[短程].{1}[音言].*?[直置真].{1}")
+        val regex1 = Regex(".*?[直置真].{1}.*?[推插揮指種播]")
+        val regex2 = Regex(".[觀歡難观観][看春着][者考老孝]")
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
             context = this, // activity context
             onResult = { resultText ->
-                OutHere@ for (block in resultText.textBlocks) {
-                    for (line in block.lines) {
-                        Log.d("OCR_Line Full", "文字內容：${line.text}")
-                        //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
-                        val matches = regex.find(line.text)
-                        if (matches != null) {
-                            Log.d("RegexMatch直播 Full", "找到 短影音 直播 推薦：${matches.value}")
-                            Log.d("OCR_Line", "位置：${line.boundingBox}")
-                            val boxc = line.boundingBox
-                            if (boxc != null) {
-                                Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/7.8f  // hard code, metrics.widthPixels / 2f
-                                Full_refresh_Position_y = (boxc.centerY()).toFloat()
-                                Log.d("RegexMatch直播", "Full_refresh_Position_x：${Full_refresh_Position_x}, Full_refresh_Position_y：${Full_refresh_Position_y}, w: ${boxc.width()}")
-                                break@OutHere
+                var isFound = false
+                try {
+                    OutHere@ for (block in resultText.textBlocks) {
+                        for (line in block.lines) {
+                            Log.d("OCR_Line Full", "文字內容：${line.text}")
+                            //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+                            val matches = regex.find(line.text)
+                            val matches1 = regex1.find(line.text)
+                            val matches2 = regex2.find(line.text)
+
+                            if (matches != null) {
+                                Log.d("checkInLiveStreamingPage", "找到 短影音 直播：${matches.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    Log.d("checkInLiveStreamingPage", "在直播頁面")
+                                    isFound = true
+                                    break@OutHere
+                                }
+                            }
+                            if (matches1 != null) {
+                                Log.d("checkInLiveStreamingPage", "找到 直播 推薦：${matches1.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    Log.d("checkInLiveStreamingPage", "在直播頁面")
+                                    isFound = true
+                                    break@OutHere
+                                }
+                            }
+                            if (matches2 != null) {
+                                Log.d("checkInLiveStreamingPage", "找到 觀看者：${matches2.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    Log.d("checkInLiveStreamingPage", "在直播頁面")
+                                    isFound = true
+                                    break@OutHere
+                                }
                             }
                         }
+                    }
+                }
+                finally {
+                    cut_image.recycle()
+                    if (isFound) {
+                        checkLiveStreamingPage_retry_count = 0
+                        notInLiveStreamingPage_reopen_request = false
+                    } else {
+                        checkLiveStreamingPage_retry_count += 1
+                        Log.d("checkInLiveStreamingPage", "直播頁面 沒找到 retry = $checkLiveStreamingPage_retry_count ")
+                    }
+                    if (checkLiveStreamingPage_retry_count > 5) {
+                        checkLiveStreamingPage_retry_count = 0
+                        notInLiveStreamingPage_reopen_request = true
                     }
                 }
             },
             onError = { error ->
                 Log.e("OCR_Result", "辨識錯誤：${error.message}")
+                cut_image.recycle()
+            })
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun UpdatePositionForFullFreshPage(snap_image: Bitmap) {
+        Full_refresh_Position_x = 0f
+        Full_refresh_Position_y = 0f
+        val cut_image = BitmapCropLib.cropToVerticalTop20percent(snap_image)
+
+        val regex = Regex("[短程].{1}[音言].*?[直置真].{1}")
+
+        TextRecognizerUtil.recognizeTextFromImage(
+            bitmap = cut_image,
+            context = this, // activity context
+            onResult = { resultText ->
+                try {
+                    OutHere@ for (block in resultText.textBlocks) {
+                        for (line in block.lines) {
+                            Log.d("OCR_Line Full", "文字內容：${line.text}")
+                            //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
+                            val matches = regex.find(line.text)
+                            if (matches != null) {
+                                Log.d("RegexMatch直播 Full", "找到 短影音 直播 推薦：${matches.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/7.8f  // hard code, metrics.widthPixels / 2f
+                                    Full_refresh_Position_y = (boxc.centerY()).toFloat()
+
+                                    if (Full_refresh_Position_y >= (metrics.heightPixels) / 5f  || Full_refresh_Position_x > (0.75f) * (metrics.widthPixels)){
+                                        //
+                                        // 如果 Full_refresh_Position_y 值有問題(大於五分之一個螢幕Y軸) retry
+                                        //
+                                        Full_refresh_Position_x = 0f
+                                        Full_refresh_Position_y = 0f
+                                        Log.d("RegexMatch直播", "Full_refresh_Position 位置不對")
+                                    }
+
+                                    Log.d("RegexMatch直播", "Full_refresh_Position_x：${Full_refresh_Position_x}, Full_refresh_Position_y：${Full_refresh_Position_y}, w: ${boxc.width()}")
+                                    break@OutHere
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                  cut_image.recycle()
+                }
+            },
+            onError = { error ->
+                Log.e("OCR_Result", "辨識錯誤：${error.message}")
+                cut_image.recycle()
             })
 
     }
@@ -1106,9 +1229,9 @@ class ScreenCaptureService : Service() {
     private fun moveLeftPage () {
         val screenX = metrics.widthPixels / 4f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.widthPixels / 1.8f
+        val MoveDistance  = metrics.widthPixels / 1.5f
         Log.d("moveLeftPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchRightLeft(screenX,screenX + MoveDistance, screenCenterY, 900)
+        touchRightLeft(screenX,screenX + MoveDistance, screenCenterY, 700)
     }
 
 

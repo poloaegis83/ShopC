@@ -130,6 +130,16 @@ object BitmapCropLib {
         return Bitmap.createBitmap(bitmap, 0, top, width, cropHeight)
     }
 
+    fun cropToVerticalTop20percent(bitmap: Bitmap): Bitmap {  // 上方 1/5
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val top = 0
+        val cropHeight = height / 5
+
+        return Bitmap.createBitmap(bitmap, 0, top, width, cropHeight)
+    }
+
     fun cropToVerticalTopQuarter(bitmap: Bitmap): Bitmap {  // 上方 1/4
         val width = bitmap.width
         val height = bitmap.height
