@@ -20,6 +20,11 @@ class MyAccessibilityService : AccessibilityService() {
                 ?: Log.e("MyAccessibilityService", "Service 尚未啟動，無法執行返回操作")
         }
 
+        fun performHome() {
+            instance?.performGlobalAction(GLOBAL_ACTION_HOME)
+                ?: Log.e("MyAccessibilityService", "Service 尚未啟動，無法執行home操作")
+        }
+
         // 紀錄目前前景的 App
         @Volatile
         var currentForegroundApp: String? = null

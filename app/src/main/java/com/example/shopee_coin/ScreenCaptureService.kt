@@ -397,7 +397,7 @@ class ScreenCaptureService : Service() {
         }
     }
 
-
+    @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
     suspend fun appCheckRestart(){
         if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning) {
@@ -411,7 +411,7 @@ class ScreenCaptureService : Service() {
                   MyAccessibilityService.performBack()
                   delay(1600L)
               }
-              //MyAccessibilityService.performBack()
+              MyAccessibilityService.performHome()
               delay(2000L)
                 Log.d("appCheckRestart", "reopenShopeeApp2")
               reopenShopeeApp(this)
@@ -550,6 +550,7 @@ class ScreenCaptureService : Service() {
         bitmapWithPadding.recycle()
         return finalBitmap
     }
+
     var Y_axis_shift = 0f
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleEventCase(bitmap: Bitmap) {
@@ -575,7 +576,6 @@ class ScreenCaptureService : Service() {
     private fun processEventCase(resultText: Text) {
         var positionYGetCoinButton = 0f
         var positionYGAP = 0f
-
 
         val regex11 = Regex("[關关][注主]")
         val regex10 = Regex("現在就.?[主王][播搔波插搂]")
@@ -967,7 +967,6 @@ class ScreenCaptureService : Service() {
             }
         }
     }
-
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun UpdatePositionForFullFreshPage(snap_image: Bitmap) {
