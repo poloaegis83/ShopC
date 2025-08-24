@@ -150,4 +150,14 @@ object BitmapCropLib {
         return Bitmap.createBitmap(bitmap, 0, top, width, cropHeight)
     }
 
+    fun cropToVerticalButton25percent(bitmap: Bitmap): Bitmap {  // 下方 1/4
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val top = ((height.toFloat()) * 0.75f).toInt()
+        val cropHeight = height / 4
+
+        return Bitmap.createBitmap(bitmap, 0, top, width, cropHeight)
+    }
+
 }

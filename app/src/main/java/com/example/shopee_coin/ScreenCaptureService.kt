@@ -71,6 +71,8 @@ class ScreenCaptureService : Service() {
 
     var checkLiveStreamingPage_retry_count = 0
     var notInLiveStreamingPage_reopen_request = false
+    var findShopeeMainPage = false
+
 
     //val CoinClaimStorage = CoinClaimStorage(this)
 
@@ -422,28 +424,46 @@ class ScreenCaptureService : Service() {
     suspend fun appCheckRestart(){
         if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning) {
             if( (!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) || notInLiveStreamingPage_reopen_request ) {
-                updateFloatButtonText("嘗試重啟蝦皮，勿動做")
-                reopenShopeeApp(this)
-                isDuringRestart = true
-                Log.d("appCheckRestart", "reopenShopeeApp")
-                delay(10000L)
-                while(MyAccessibilityService.checkForegroundApp()) {
-                  Log.d("appCheckRestart", "performBack()")
-                  MyAccessibilityService.performBack()
-                  delay(1600L)
+                try {
+                    var mainPageCounter = 0
+                    updateFloatButtonText("嘗試重啟蝦皮，勿動做")
+                    reopenShopeeApp(this)
+                    isDuringRestart = true
+                    Log.d("appCheckRestart", "reopenShopeeApp")
+                    delay(10000L)
+                    while(MyAccessibilityService.checkForegroundApp()) {
+                        Log.d("appCheckRestart", "performBack()")
+                        MyAccessibilityService.performBack()
+                        delay(1600L)
+                    }
+                    MyAccessibilityService.performHome()
+                    updateFloatButtonText("重啟蝦皮，勿動螢幕")
+                    delay(3000L)
+                    Log.d("appCheckRestart", "reopenShopeeApp2")
+                    reopenShopeeApp(this)
+                    delay(8000L)
+                    while ( !findShopeeMainPage) {
+                        Log.d("appCheckRestart", "checkShopeeMainPage $mainPageCounter")
+                        checkShopeeMainPage()
+                        mainPageCounter += 1
+                        if (mainPageCounter > 8) {
+                            break
+                        }
+                        delay(6000L)
+                    }
+                    touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
+                    delay(10000L)
+                    moveLeftPage()
+                    delay(8000L)
+                    moveLeftPage()
+                    delay(8000L)
+                    moveRightPage()
+                    delay(8000L)
+                    FindNextRoom()
+                } finally {
+                    isDuringRestart = false
+                    findShopeeMainPage = false
                 }
-                MyAccessibilityService.performHome()
-                updateFloatButtonText("重啟蝦皮，勿動螢幕")
-                delay(3000L)
-                Log.d("appCheckRestart", "reopenShopeeApp2")
-                reopenShopeeApp(this)
-                delay(12000L)
-                touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
-                delay(12000L)
-                moveLeftPage()
-                delay(6000L)
-                FindNextRoom()
-                isDuringRestart = false
             }
         }
     }
@@ -1129,6 +1149,81 @@ class ScreenCaptureService : Service() {
     }
 
 
+    @RequiresApi(Build.VERSION_CODES.N)
+    private suspend fun checkShopeeMainPage() {
+
+        if (findShopeeMainPage)
+        {
+            return
+        }
+
+        val image = imageReader?.acquireLatestImage()
+        var bitmap: Bitmap? = null
+        if(image == null){
+            findShopeeMainPage = true
+            delay(25000L)
+            return
+        }
+        bitmap = getBitmapFromImage(image)
+
+        val cut_image = BitmapCropLib.cropToVerticalButton25percent(bitmap)
+        bitmap.recycle()
+
+        val regex = Regex("[直置真][播搔波插搂][短程].{1}[音言]")
+        val regex1 = Regex("蝦[拼洋]")
+
+        TextRecognizerUtil.recognizeTextFromImage(
+            bitmap = cut_image,
+            context = this, // activity context
+            onResult = { resultText ->
+                try {
+                    findShopeeMainPage = false
+                    OutHere@ for (block in resultText.textBlocks) {
+                        for (line in block.lines) {
+                            Log.d("OCR_Line", "文字內容：${line.text}")
+                            val matches = regex.find(line.text)
+                            val matches1 = regex1.find(line.text)
+                            if (matches != null ) {
+                                Log.d("FindShopeeMainPage", "找到 直播短影音 or 蝦拼 in low 25% page, main page：${matches.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    if (boxc.left < ((metrics.widthPixels/2f)  + 50f) && boxc.right > ((metrics.widthPixels/2f)  - 50f)) {
+                                        Log.d("FindShopeeMainPage", "找到 直播短影音 in low 25% page  location right")
+                                        findShopeeMainPage = true
+                                        break@OutHere
+                                    }
+                                }
+                            }
+
+                            if (matches1 != null ) {
+                                Log.d("FindShopeeMainPage", "找到 直播短影音 or 蝦拼 in low 25% page, main page：${matches1.value}")
+                                Log.d("OCR_Line", "位置：${line.boundingBox}")
+                                val boxc = line.boundingBox
+                                if (boxc != null) {
+                                    if (boxc.left < ((metrics.widthPixels/3f) )) {
+                                        Log.d("FindShopeeMainPage", "找到 蝦拼 in low 25% page  location right")
+                                        findShopeeMainPage = true
+                                        break@OutHere
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                } finally {
+                    cut_image.recycle()
+                    image.close()
+                }
+            },
+            onError = { error ->
+                Log.e("OCR_Result", "辨識錯誤：${error.message}")
+                cut_image.recycle()
+                image.close()
+            })
+    }
+
+
 
     private suspend fun recognizeTextAndHandleGesture(
         bitmap: Bitmap,
@@ -1234,6 +1329,15 @@ class ScreenCaptureService : Service() {
         touchRightLeft(screenX,screenX + MoveDistance, screenCenterY, 700)
     }
 
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun moveRightPage () {
+        val screenX = metrics.widthPixels / 4f
+        val screenCenterY = metrics.heightPixels / 2f
+        val MoveDistance  = metrics.widthPixels / 1.5f
+        Log.d("moveRightPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
+        touchRightLeft(screenX + MoveDistance, screenX , screenCenterY, 700)
+    }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun touchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {

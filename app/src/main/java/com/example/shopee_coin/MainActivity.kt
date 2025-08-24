@@ -1018,6 +1018,11 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     private fun startShopCoinService() {
         //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
+        if (!MyAccessibilityService.isRunning) {
+            Toast.makeText(this, "❌請先 打開 或 重開 無障礙服務", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val serviceRunning = ScreenCaptureService.isRunning
         if (!MediaProjectionHolder.hasPermission()) {
             val intent = Intent(this, ScreenCapturePermissionActivity::class.java)
