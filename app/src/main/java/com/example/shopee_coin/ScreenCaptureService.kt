@@ -38,9 +38,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Calendar
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -452,13 +449,13 @@ class ScreenCaptureService : Service() {
                         delay(6000L)
                     }
                     touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
-                    delay(18000L)
+                    delay(16000L)
                     moveLeftPage()
                     //delay(8000L)
                     //moveLeftPage()
                     //delay(8000L)
                     //moveRightPage()
-                    //delay(5000L)
+                    delay(5000L)
                     FindNextRoom()
                     delay(2000L)
                 } finally {

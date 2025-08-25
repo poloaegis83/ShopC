@@ -20,9 +20,9 @@ android {
 
     buildTypes {
         release {
-            isDebuggable = false         // ✅ 正確寫法
-            isMinifyEnabled = true       // 開啟 R8
-            isShrinkResources = true       // 移除沒用資源
+            isDebuggable = false         //  正確寫法
+            //isMinifyEnabled = true       // 開啟 R8
+            //isShrinkResources = true       // 移除沒用資源
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
