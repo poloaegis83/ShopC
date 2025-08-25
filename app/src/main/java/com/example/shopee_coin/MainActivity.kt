@@ -439,7 +439,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         )
                     }
                     Spacer(modifier = Modifier.width(1.dp))
-                    Text(text = "自動重啟",
+                    Text(text = "自動重啟蝦皮",
                         fontSize = 12.sp // 自訂字體大小
                     )
 
@@ -516,7 +516,12 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             R.drawable.money17,
             R.drawable.money18,
             R.drawable.money19,
-            R.drawable.money20
+            R.drawable.money20,
+            R.drawable.money21,
+            R.drawable.money22,
+            R.drawable.money23,
+            R.drawable.money24,
+            R.drawable.money25
         )
 
         // 狀態：剩餘可用圖片池

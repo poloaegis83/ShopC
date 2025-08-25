@@ -38,6 +38,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Calendar
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -325,14 +328,14 @@ class ScreenCaptureService : Service() {
         }
     }
 
-
     @SuppressLint("QueryPermissionsNeeded")
     fun reopenShopeeApp(context: Context) {
         val pm = context.packageManager
         var launchIntent = pm.getLaunchIntentForPackage("com.shopee.tw")
-
+        Log.e("reopenShopeeApp", "launchIntent1")
         if (launchIntent == null) {
             // fallback: 查找 Main + Launcher Activity
+            Log.e("reopenShopeeApp", "launchIntent2 == null")
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 `package` = "com.shopee.tw"
@@ -344,11 +347,12 @@ class ScreenCaptureService : Service() {
                     addCategory(Intent.CATEGORY_LAUNCHER)
                     component = ComponentName(activityInfo.packageName, activityInfo.name)
                 }
+                Log.e("reopenShopeeApp", "launchIntent2 == null")
             }
         }
         //Log.e("Shopee", "找不到可啟動的 Activity")
         if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK  or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             context.startActivity(launchIntent)
         } else {
             Log.e("Shopee", "找不到可啟動的 Activity")
@@ -426,22 +430,18 @@ class ScreenCaptureService : Service() {
             if( (!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) || notInLiveStreamingPage_reopen_request ) {
                 try {
                     var mainPageCounter = 0
+                    isDuringRestart = true
+                    MyAccessibilityService.performHome()
+                    delay(5000L)
                     updateFloatButtonText("嘗試重啟蝦皮，勿動做")
                     reopenShopeeApp(this)
-                    isDuringRestart = true
                     Log.d("appCheckRestart", "reopenShopeeApp")
-                    delay(10000L)
-                    while(MyAccessibilityService.checkForegroundApp()) {
-                        Log.d("appCheckRestart", "performBack()")
-                        MyAccessibilityService.performBack()
-                        delay(1600L)
-                    }
-                    MyAccessibilityService.performHome()
                     updateFloatButtonText("重啟蝦皮，勿動螢幕")
-                    delay(3000L)
+                    delay(15000L)
+
                     Log.d("appCheckRestart", "reopenShopeeApp2")
-                    reopenShopeeApp(this)
-                    delay(8000L)
+                    //reopenShopeeApp(this)
+                    //delay(8000L)
                     while ( !findShopeeMainPage) {
                         Log.d("appCheckRestart", "checkShopeeMainPage $mainPageCounter")
                         checkShopeeMainPage()
@@ -452,14 +452,15 @@ class ScreenCaptureService : Service() {
                         delay(6000L)
                     }
                     touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
-                    delay(10000L)
+                    delay(18000L)
                     moveLeftPage()
-                    delay(8000L)
-                    moveLeftPage()
-                    delay(8000L)
-                    moveRightPage()
-                    delay(8000L)
+                    //delay(8000L)
+                    //moveLeftPage()
+                    //delay(8000L)
+                    //moveRightPage()
+                    //delay(5000L)
                     FindNextRoom()
+                    delay(2000L)
                 } finally {
                     isDuringRestart = false
                     findShopeeMainPage = false
