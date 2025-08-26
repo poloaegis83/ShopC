@@ -55,7 +55,7 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var lastCaptureTime = 0L
     val MoveActionMutex = Mutex()
-    var isOn = false
+    //var isOn = false
     var CallBack_Interval = 5000L
     var NotFindConter = 0
     var SearchCount = 0
@@ -73,6 +73,8 @@ class ScreenCaptureService : Service() {
     var notInLiveStreamingPage_reopen_request = false
     var findShopeeMainPage = false
 
+    var mainPageStreamLiveEntry_x = 0f
+    var mainPageStreamLiveEntry_y = 0f
 
     //val CoinClaimStorage = CoinClaimStorage(this)
 
@@ -124,7 +126,6 @@ class ScreenCaptureService : Service() {
         fun canCall(): Boolean {
             val now = System.currentTimeMillis()
             val Millis = 30 * 1000  // 30 秒
-
             return if (now - lastCallTime >= Millis) {
                 lastCallTime = now
                 true
@@ -134,13 +135,12 @@ class ScreenCaptureService : Service() {
         }
     }
 
-
     object AppShopCheckerLimiter {
         private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
 
         fun canCall(): Boolean {
             val now = System.currentTimeMillis()
-            val Millis = 2 * 60 * 1000  //  2 mins
+            val Millis = 15 * 1000  //  2 mins
 
             return if (now - lastCallTime >= Millis) {
                 lastCallTime = now
@@ -148,6 +148,9 @@ class ScreenCaptureService : Service() {
             } else {
                 false
             }
+        }
+        fun passCall() {
+            lastCallTime = 0
         }
     }
 
@@ -326,7 +329,7 @@ class ScreenCaptureService : Service() {
     }
 
     @SuppressLint("QueryPermissionsNeeded")
-    fun reopenShopeeApp(context: Context) {
+    fun reopenShopeeApp(context: Context, mode: Int) {
         val pm = context.packageManager
         var launchIntent = pm.getLaunchIntentForPackage("com.shopee.tw")
         Log.e("reopenShopeeApp", "launchIntent1")
@@ -349,7 +352,12 @@ class ScreenCaptureService : Service() {
         }
         //Log.e("Shopee", "找不到可啟動的 Activity")
         if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK  or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            if(mode == 1){
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            } else if (mode == 2) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+
             context.startActivity(launchIntent)
         } else {
             Log.e("Shopee", "找不到可啟動的 Activity")
@@ -359,7 +367,7 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private fun SearchLogic(IsInit: Boolean) {
 
-        Log.d("checkForegroundApp()", "：${MyAccessibilityService.checkForegroundApp()}")
+        //Log.d("checkForegroundApp()", "：${MyAccessibilityService.checkForegroundApp()}")
 
         val (T_hour, T_mins) = TimeLib.GetTime()
         var UpValueNow = 0f
@@ -423,48 +431,93 @@ class ScreenCaptureService : Service() {
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
     suspend fun appCheckRestart(){
-        if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning) {
-            if( (!MyAccessibilityService.checkForegroundApp() && AppShopCheckerLimiter.canCall()) || notInLiveStreamingPage_reopen_request ) {
-                try {
-                    var mainPageCounter = 0
+        if (!AppShopCheckerLimiter.canCall()){
+            return
+        }
+        if(GlobalValueHolder.appCheckRestartFeature && MyAccessibilityService.isRunning && !isDuringRestart) {
+            var driveSuccess = false
+            try {
+                if(!MyAccessibilityService.checkForegroundApp()) {
                     isDuringRestart = true
                     MyAccessibilityService.performHome()
                     delay(5000L)
+
                     updateFloatButtonText("嘗試重啟蝦皮，勿動做")
-                    reopenShopeeApp(this)
+                    reopenShopeeApp(this,1)
                     Log.d("appCheckRestart", "reopenShopeeApp")
                     updateFloatButtonText("重啟蝦皮，勿動螢幕")
                     delay(15000L)
 
-                    Log.d("appCheckRestart", "reopenShopeeApp2")
-                    //reopenShopeeApp(this)
-                    //delay(8000L)
-                    while ( !findShopeeMainPage) {
-                        Log.d("appCheckRestart", "checkShopeeMainPage $mainPageCounter")
-                        checkShopeeMainPage()
-                        mainPageCounter += 1
-                        if (mainPageCounter > 8) {
-                            break
-                        }
-                        delay(6000L)
+                    driveSuccess = backToMainAndDriveToStream()
+
+                    if (driveSuccess) {
+                        liveStreamPageCorrection()
                     }
-                    touchClick (metrics.widthPixels / 2f,metrics.heightPixels - 10f)
-                    delay(16000L)
-                    moveLeftPage()
-                    //delay(8000L)
-                    //moveLeftPage()
-                    //delay(8000L)
-                    //moveRightPage()
-                    delay(5000L)
-                    FindNextRoom()
-                    delay(2000L)
-                } finally {
-                    isDuringRestart = false
-                    findShopeeMainPage = false
+
+                } else if ( notInLiveStreamingPage_reopen_request) {
+                    isDuringRestart = true
+                    driveSuccess = backToMainAndDriveToStream()
+                    if (driveSuccess) {
+                        liveStreamPageCorrection()
+                    }
                 }
+            } finally {
+                isDuringRestart = false
+                /*if ( !MyAccessibilityService.checkForegroundApp()) {
+                    AppShopCheckerLimiter.passCall()
+                }
+                if (!driveSuccess) {
+                    Log.d("appCheckRestart", "reopenShopeeApp2")
+                    delay(3000L)
+                    MyAccessibilityService.performHome()
+                    delay(5000L)
+                    reopenShopeeApp(this,2)
+                    AppShopCheckerLimiter.passCall()
+                }*/
             }
         }
     }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    suspend fun liveStreamPageCorrection ()
+    {
+        delay(14000L)
+        moveLeftPage()
+        delay(8000L)
+        moveLeftPage()
+        delay(8000L)
+        moveRightPage()
+        //delay(5000L)
+        //FindNextRoom()
+        delay(2000L)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    suspend fun backToMainAndDriveToStream(): Boolean {
+        updateFloatButtonText("嘗試導回直播頁面")
+        findShopeeMainPage = false
+        var retry = 0
+        while (!findShopeeMainPage) {
+            if (retry > 10) {
+              break
+            }
+            PlatformBackGesture()
+            checkShopeeMainPage()
+            delay(6000L)
+            retry += 1
+        }
+        if (findShopeeMainPage) {
+            delay(5000L)
+            mainPageStreamLiveEntry_x = metrics.widthPixels / 2f
+            touchClick (mainPageStreamLiveEntry_x,mainPageStreamLiveEntry_y - 12f)
+            delay(3000L)
+            return true
+        } else {
+            return false
+        }
+
+    }
+
 
     private fun intervalModifier () {
 
@@ -475,7 +528,7 @@ class ScreenCaptureService : Service() {
             return
         }
 
-        if (!isOn) {
+        if (!GlobalValueHolder.isOn) {
             updateFloatButtonText("已暫停 點擊打開")
             Log.d("OCR_Line", "Feature Close")
             return
@@ -513,9 +566,9 @@ class ScreenCaptureService : Service() {
         }
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        isOn = prefs.getBoolean("OCR_ENABLED", false)
+        //GlobalValueHolder.isOn = prefs.getBoolean("OCR_ENABLED", false)
 
-        if (isOn) {
+        if (GlobalValueHolder.isOn) {
             Log.d("OCR_Line", "Feature Open")
         } else {
             Log.d("OCR_Line", "Feature Close")
@@ -1082,7 +1135,7 @@ class ScreenCaptureService : Service() {
                         checkLiveStreamingPage_retry_count += 1
                         Log.d("checkInLiveStreamingPage", "直播頁面 沒找到 retry = $checkLiveStreamingPage_retry_count ")
                     }
-                    if (checkLiveStreamingPage_retry_count > 5) {
+                    if (checkLiveStreamingPage_retry_count > 6) {
                         checkLiveStreamingPage_retry_count = 0
                         notInLiveStreamingPage_reopen_request = true
                     }
@@ -1188,6 +1241,7 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/2f)  + 50f) && boxc.right > ((metrics.widthPixels/2f)  - 50f)) {
                                         Log.d("FindShopeeMainPage", "找到 直播短影音 in low 25% page  location right")
+                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(),2) + metrics.heightPixels * 0.75f
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }
@@ -1201,6 +1255,7 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/3f) )) {
                                         Log.d("FindShopeeMainPage", "找到 蝦拼 in low 25% page  location right")
+                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(),2) + metrics.heightPixels * 0.75f
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }

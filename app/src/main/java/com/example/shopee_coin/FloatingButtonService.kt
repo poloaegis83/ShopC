@@ -22,7 +22,7 @@ import androidx.core.content.edit
 import java.util.Calendar
 import kotlin.math.absoluteValue
 
-var IsOn: Boolean = false
+//var IsOn: Boolean = false
 class FloatingButtonService : Service() {
 
     private lateinit var windowManager: WindowManager
@@ -148,13 +148,26 @@ class FloatingButtonService : Service() {
     }
 
     private fun onFloatingButtonClick() {
-        IsOn = !IsOn
+        //IsOn = !IsOn
+        GlobalValueHolder.isOn = !GlobalValueHolder.isOn
+        if (GlobalValueHolder.isOn) {
+            updateStatusText("已開啟")
+        } else {
+            updateStatusText("暫停")
+        }
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        prefs.edit { putBoolean("OCR_ENABLED", IsOn) }
-        Log.d("Float Button", "Feature FB ${IsOn}")
-        val resId = if (IsOn) R.drawable.on_button else R.drawable.off_button
+        prefs.edit { putBoolean("OCR_ENABLED", GlobalValueHolder.isOn) }
+        Log.d("Float Button", "Feature FB ${GlobalValueHolder.isOn}")
+        val resId = if (GlobalValueHolder.isOn) R.drawable.on_button else R.drawable.off_button
         button.setImageResource(resId)
     }
+
+    fun updateOnOff(status:Boolean) {
+        GlobalValueHolder.isOn = status
+        val resId = if (GlobalValueHolder.isOn) R.drawable.on_button else R.drawable.off_button
+        button.setImageResource(resId)
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
