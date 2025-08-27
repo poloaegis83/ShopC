@@ -185,6 +185,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 }// end of Scaffold
             } // end of Shopee_coinTheme
 
+            KeepScreenOn()
             DoubleBackToExitApp()
         }  // end of setContent
 
@@ -194,9 +195,10 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     @Composable
     fun SetPageItems() {
 
-        var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
-        var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
-        var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
+        //var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
+        //var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
+        //var notInTimeBcckToHere by remember { mutableStateOf(GlobalValueHolder.notInTimeBcckToHere) }
+        //var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
         var advanceSetting by remember { mutableStateOf(false) }
 
         val configuration = LocalConfiguration.current
@@ -311,9 +313,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     contentAlignment = Alignment.Center
                 ){
                     Checkbox(
-                        checked = isTimeLimit,
+                        checked = GlobalValueHolder.IsTimeLimit,
                         onCheckedChange = { checked ->
-                            isTimeLimit = checked
+                            //isTimeLimit = checked
                             GlobalValueHolder.IsTimeLimit = checked
                         },
                         //colors = CheckboxDefaults.colors(
@@ -340,10 +342,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                             if (!checked) {
                                 // 進階選項取消勾選時，重置內部狀態
                                 text2 = ""
-                                isLowEndDevice = false
-                                appCheckRestartFeature = false
                                 GlobalValueHolder.IsLowEndDevice = false
                                 GlobalValueHolder.appCheckRestartFeature = false
+                                GlobalValueHolder.notInTimeBcckToHere = false
                             }
                         },
                     )
@@ -353,7 +354,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 Text(text = "進階選項")
             }
 
-            if (isTimeLimit) {
+            if (GlobalValueHolder.IsTimeLimit) {
                 Row(modifier = Modifier.padding(8.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
                         Button(onClick = { timePickerDialogStart.show() }) {
@@ -404,9 +405,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     contentAlignment = Alignment.Center
                     ) {
                         Checkbox(
-                            checked = isLowEndDevice,
+                            checked = GlobalValueHolder.IsLowEndDevice ,
                             onCheckedChange = { checked ->
-                                isLowEndDevice = checked
+                                //isLowEndDevice = checked
                                 GlobalValueHolder.IsLowEndDevice = checked
                             },
                             //colors = CheckboxDefaults.colors(
@@ -427,10 +428,13 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         Checkbox(
-                            checked = appCheckRestartFeature,
+                            checked = GlobalValueHolder.appCheckRestartFeature,
                             onCheckedChange = { checked ->
-                                appCheckRestartFeature = checked
+                                //appCheckRestartFeature = checked
                                 GlobalValueHolder.appCheckRestartFeature = checked
+                                if (!checked) {
+                                    GlobalValueHolder.notInTimeBcckToHere = false
+                                }
                             },
                             //colors = CheckboxDefaults.colors(
                             //    checkedColor = Color.Black,
@@ -444,7 +448,33 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     )
 
                 }
-
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ){
+                    Box(
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = GlobalValueHolder.notInTimeBcckToHere,
+                            onCheckedChange = { checked ->
+                                //notInTimeBcckToHere = checked
+                                GlobalValueHolder.notInTimeBcckToHere = checked
+                            },
+                            //colors = CheckboxDefaults.colors(
+                            //    checkedColor = Color.Black,
+                            //    uncheckedColor = Color.Black
+                            //)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(text = "不再排程時段內，返回此APP等待",
+                        fontSize = 11.sp // 自訂字體大小
+                    )
+                }
             }
 
 
@@ -492,6 +522,21 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
     }
 
+    @Composable
+    fun KeepScreenOn() {
+        val context = LocalContext.current
+        val keepOn = GlobalValueHolder.notInTimeBcckToHere   // 直接讀 state
+
+        DisposableEffect(keepOn) {
+            val activity = context as Activity
+            if (keepOn) {
+                activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            onDispose {
+                activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
 
     @Composable
     fun ImageForMe() {
@@ -872,11 +917,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 300.dp)
                         ) {
-                            itemsIndexed(todayClaims.sortedBy { it.timestamp }) { index, claim ->
+                            val sortedClaims = todayClaims.sortedByDescending { it.timestamp }
+
+                            itemsIndexed(sortedClaims) { index, claim ->
                                 val timeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(claim.timestamp))
 
-                                val diffString = if (index == 0) "----" else {
-                                    val diffMs = claim.timestamp - todayClaims[index - 1].timestamp
+                                val diffString = if (index == 0) {
+                                    "----"
+                                } else {
+                                    val diffMs = sortedClaims[index].timestamp - sortedClaims[index - 1].timestamp
                                     val diffSec = diffMs / 1000
                                     val minutes = diffSec / 60
                                     val seconds = diffSec % 60

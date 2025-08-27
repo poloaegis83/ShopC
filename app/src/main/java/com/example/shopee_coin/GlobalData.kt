@@ -2,6 +2,9 @@ package com.example.shopee_coin
 
 import android.app.Activity
 import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 object MediaProjectionHolder {
     var resultCode: Int = -1
@@ -14,14 +17,15 @@ object MediaProjectionHolder {
 
 object GlobalValueHolder {
     var DownValue: Float = 0f
-    var IsLowEndDevice: Boolean = false
+    var IsLowEndDevice by mutableStateOf(false)
     var StartHour: Int = 8
     var StartMinute: Int = 30
     var EndHour: Int = 0
     var EndMinute: Int = 0
-    var IsTimeLimit: Boolean = false
-    var appCheckRestartFeature = false
+    var IsTimeLimit by mutableStateOf(false)
+    var appCheckRestartFeature by mutableStateOf(false)
     var isOn = false
+    var notInTimeBcckToHere by mutableStateOf(false)
 }
 
 var isEnabledAcService = true

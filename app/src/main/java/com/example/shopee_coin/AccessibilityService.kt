@@ -30,11 +30,17 @@ class MyAccessibilityService : AccessibilityService() {
         var currentForegroundApp: String? = null
 
         private const val TARGET_APP = "com.shopee.tw"   // 預期的 App (hardcode)
+        private const val TARGET_MY_APP = "com.example.shopee_coin"   // 預期的 App (hardcode)
 
         // 對外提供檢查 API
         fun checkForegroundApp(): Boolean {
             Log.d("MyAccessibilityService", "currentForegroundApp = $currentForegroundApp")
             return currentForegroundApp == TARGET_APP
+        }
+
+        fun checkForegroundMyApp(): Boolean {
+            Log.d("MyAccessibilityService", "checkForegroundMyApp = $currentForegroundApp")
+            return currentForegroundApp == TARGET_MY_APP
         }
 
     }

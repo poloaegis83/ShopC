@@ -284,13 +284,35 @@ class ScreenCaptureService : Service() {
                 } else {
                     // 不在執行時間，睡個較長時間減輕 CPU 負擔
                     updateFloatButtonText("⏸\uFE0F未在排程時段中")
-                    delay(6000L) // 6秒，根據需求調整
+                    if (!GlobalValueHolder.notInTimeBcckToHere){
+                        delay(6000L) // 6秒，根據需求調整
+                    } else {
+                        delay(3500L)
+                        updateFloatButtonText("待時段內將自動開蝦皮")
+                        if (!MyAccessibilityService.checkForegroundMyApp()){
+                            openMyApp()
+                        }
+                        delay(3500L)
+                    }
                 }
                 Counter = (Counter + 1) % 10
             }
         }
     }
 
+
+    fun openMyApp() {
+        serviceScope.launch {
+            Log.d("openMyApp", "openMyApp")
+            // this@ScreenCaptureService 是 Context
+            val context: Context = this@ScreenCaptureService
+            val intent = context.packageManager.getLaunchIntentForPackage("com.example.shopee_coin")
+            intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // Service 中啟動 Activity 必須加
+            if (intent != null) {
+                context.startActivity(intent)
+            }
+        }
+    }
     private fun stopCaptureLoop() {
         captureJob?.cancel()
         captureJob = null
