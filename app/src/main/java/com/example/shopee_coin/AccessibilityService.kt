@@ -30,7 +30,7 @@ class MyAccessibilityService : AccessibilityService() {
         var currentForegroundApp: String? = null
 
         private const val TARGET_APP = "com.shopee.tw"   // 預期的 App (hardcode)
-        private const val TARGET_MY_APP = "com.example.shopee_coin"   // 預期的 App (hardcode)
+        private const val TARGET_MY_APP = "com.meteor.alderlake"   // 預期的 App (hardcode)
 
         // 對外提供檢查 API
         fun checkForegroundApp(): Boolean {
@@ -88,6 +88,38 @@ class MyAccessibilityService : AccessibilityService() {
 
         dispatchGesture(gesture, null, null)
         Log.d("MyAccessibilityService", "已執行滑動手勢")
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun swipeBezier(
+        fromX: Float,
+        fromY: Float,
+        toX: Float,
+        toY: Float,
+        duration: Long = 1000L
+    ) {
+        val path = Path().apply {
+            moveTo(fromX, fromY)
+
+            // 生成兩個隨機控制點，增加自然度
+            val controlX1 = fromX + (toX - fromX) * 0.3f + (-60..60).random()
+            val controlY1 = fromY + (toY - fromY) * 0.3f + (-60..60).random()
+
+            val controlX2 = fromX + (toX - fromX) * 0.6f + (-60..60).random()
+            val controlY2 = fromY + (toY - fromY) * 0.6f + (-60..60).random()
+
+            // 三階貝茲曲線
+            cubicTo(controlX1, controlY1, controlX2, controlY2, toX, toY)
+        }
+
+        // duration 基本值 + 隨機 0–50ms
+        val finalDuration = duration + (0..50).random()
+
+        val stroke = GestureDescription.StrokeDescription(path, 0, duration)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+
+        dispatchGesture(gesture, null, null)
+        Log.d("MyAccessibilityService", "已執行貝茲曲線滑動")
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

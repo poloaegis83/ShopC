@@ -306,7 +306,7 @@ class ScreenCaptureService : Service() {
             Log.d("openMyApp", "openMyApp")
             // this@ScreenCaptureService 是 Context
             val context: Context = this@ScreenCaptureService
-            val intent = context.packageManager.getLaunchIntentForPackage("com.example.shopee_coin")
+            val intent = context.packageManager.getLaunchIntentForPackage("com.meteor.alderlake")
             intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // Service 中啟動 Activity 必須加
             if (intent != null) {
                 context.startActivity(intent)
@@ -1417,13 +1417,15 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private fun touchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
+        //ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
+        ACservice?.swipeBezier(X, Y_S , X, Y_E, MoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun touchRightLeft (X_S: Float, X_E: Float, Y: Float, MoveLong: Long) {
         val ACservice = MyAccessibilityService.instance
-        ACservice?.swipe(X_S, Y , X_E, Y, MoveLong)
+        //ACservice?.swipe(X_S, Y , X_E, Y, MoveLong)
+        ACservice?.swipeBezier(X_S, Y , X_E, Y, MoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

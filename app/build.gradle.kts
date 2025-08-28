@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.shopee_coin"
+        applicationId = "com.meteor.alderlake"
         minSdk = 23
         targetSdk = 35
         versionCode = 2
