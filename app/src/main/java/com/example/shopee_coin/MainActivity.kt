@@ -905,6 +905,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 title = { Text("今日領取明細", fontSize = 14.sp) },
                 text = {
                     Column {
+                        // 標題列
                         Row(Modifier.fillMaxWidth()) {
                             Text("排序", modifier = Modifier.weight(0.2f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text("蝦幣", modifier = Modifier.weight(0.3f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -917,15 +918,18 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 300.dp)
                         ) {
+                            // 按時間由近到遠
                             val sortedClaims = todayClaims.sortedByDescending { it.timestamp }
 
                             itemsIndexed(sortedClaims) { index, claim ->
-                                val timeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(claim.timestamp))
+                                val timeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                                    .format(Date(claim.timestamp))
 
-                                val diffString = if (index == 0) {
-                                    "----"
+                                // 計算與下一筆的時間差
+                                val diffString = if (index == sortedClaims.lastIndex) {
+                                    "----" // 最舊的沒有上一筆
                                 } else {
-                                    val diffMs = sortedClaims[index].timestamp - sortedClaims[index - 1].timestamp
+                                    val diffMs = sortedClaims[index].timestamp - sortedClaims[index + 1].timestamp
                                     val diffSec = diffMs / 1000
                                     val minutes = diffSec / 60
                                     val seconds = diffSec % 60
@@ -933,7 +937,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 }
 
                                 Row(Modifier.fillMaxWidth()) {
-                                    Text("${index + 1}", modifier = Modifier.weight(0.2f), fontSize = 12.sp)
+                                    // 排序改成反向顯示：最新那筆是最大數字
+                                    Text("${sortedClaims.size - index}", modifier = Modifier.weight(0.2f), fontSize = 12.sp)
                                     Text("%.2f".format(claim.amount), modifier = Modifier.weight(0.3f), fontSize = 12.sp)
                                     Text(timeString, modifier = Modifier.weight(0.5f), fontSize = 12.sp)
                                     Text(diffString, modifier = Modifier.weight(0.6f), fontSize = 12.sp)
