@@ -933,6 +933,7 @@ class ScreenCaptureService : Service() {
                                         Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
                                         Log.d("OCR_Line boxg", "位置centerY：${boxg.centerY().toFloat()}")
                                         CoinStates = CState.GET_COIN_READY
+                                        gFindCoinButNoTime = 0
                                         floatingService?.resetFloatButtonLocation()
                                         if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
                                             Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
