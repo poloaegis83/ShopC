@@ -26,6 +26,7 @@ object GlobalValueHolder {
     var appCheckRestartFeature by mutableStateOf(false)
     var isOn = false
     var notInTimeBcckToHere by mutableStateOf(false)
+    var advanceSetting by mutableStateOf(false)
 }
 
 var isEnabledAcService = true

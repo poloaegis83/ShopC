@@ -1058,7 +1058,7 @@ class ScreenCaptureService : Service() {
             GetCoinFreezeCount = 0
         }
 
-        if (GetCoinFreezeCount >= 2){
+        if (GetCoinFreezeCount > 2){
             Log.d("move", "GetCoinFreezeCount >= 2")
             serviceScope.launch {
                 MoveActionMutex.withLock {

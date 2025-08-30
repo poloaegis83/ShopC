@@ -199,7 +199,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         //var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
         //var notInTimeBcckToHere by remember { mutableStateOf(GlobalValueHolder.notInTimeBcckToHere) }
         //var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
-        var advanceSetting by remember { mutableStateOf(false) }
+        //var advanceSetting by remember { mutableStateOf(false) }
 
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
@@ -336,9 +336,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     contentAlignment = Alignment.Center
                 ){
                     Checkbox(
-                        checked = advanceSetting,
+                        checked = GlobalValueHolder.advanceSetting,
                         onCheckedChange = { checked ->
-                            advanceSetting = checked
+                            GlobalValueHolder.advanceSetting = checked
                             if (!checked) {
                                 // 進階選項取消勾選時，重置內部狀態
                                 text2 = ""
@@ -382,7 +382,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 thickness = 2.dp,        // 線的粗細
                 color = Color.Gray     // 線的顏色
             )
-            CoinStatsScreen(coinStorage, advanceSetting)
+            CoinStatsScreen(coinStorage, GlobalValueHolder.advanceSetting)
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()      // 線的寬度（可改成固定寬度）
@@ -393,7 +393,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
             AccessibilityStatusScreen()
 
-            if (advanceSetting) {
+            if (GlobalValueHolder.advanceSetting) {
                 Row(
                     modifier = Modifier.padding(top = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -478,7 +478,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             }
 
 
-            if (advanceSetting) {
+            if (GlobalValueHolder.advanceSetting) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
