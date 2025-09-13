@@ -282,17 +282,21 @@ class ScreenCaptureService : Service() {
                     intervalModifier()
                     delay(CallBack_Interval)
                 } else {
-                    // 不在執行時間，睡個較長時間減輕 CPU 負擔
-                    updateFloatButtonText("⏸\uFE0F未在排程時段中")
-                    if (!GlobalValueHolder.notInTimeBcckToHere){
-                        delay(6000L) // 6秒，根據需求調整
-                    } else {
-                        delay(3500L)
-                        updateFloatButtonText("待時段內將自動開蝦皮")
-                        if (!MyAccessibilityService.checkForegroundMyApp()){
-                            openMyApp()
+                    if (GlobalValueHolder.isOn) {
+                        // 不在執行時間，睡個較長時間減輕 CPU 負擔
+                        updateFloatButtonText("⏸\uFE0F未在排程時段中")
+                        if (!GlobalValueHolder.notInTimeBcckToHere){
+                            delay(6000L) // 6秒，根據需求調整
+                        } else {
+                            delay(3500L)
+                            updateFloatButtonText("待時段內將自動開蝦皮")
+                            if (!MyAccessibilityService.checkForegroundMyApp() && Counter%3 == 0){
+                                openMyApp()
+                            }
+                            delay(3500L)
                         }
-                        delay(3500L)
+                    } else {
+                        updateFloatButtonText("⏸\uFE0F暫停時段 & 按鈕關閉")
                     }
                 }
                 Counter = (Counter + 1) % 10
@@ -478,6 +482,7 @@ class ScreenCaptureService : Service() {
 
                 } else if ( notInLiveStreamingPage_reopen_request) {
                     isDuringRestart = true
+                    notInLiveStreamingPage_reopen_request = false
                     driveSuccess = backToMainAndDriveToStream()
                     if (driveSuccess) {
                         liveStreamPageCorrection()
@@ -1100,7 +1105,7 @@ class ScreenCaptureService : Service() {
         val cut_image = BitmapCropLib.cropToVerticalTopQuarter(snap_image)
         val regex = Regex("[短程].{1}[音言].*?[直置真].{1}")
         val regex1 = Regex(".*?[直置真].{1}.*?[推插揮指種播]")
-        val regex2 = Regex(".[觀歡難观観][看春着][者考老孝]")
+        val regex2 = Regex("[觀歡難观観][看春着][者考老孝]")
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
@@ -1158,7 +1163,7 @@ class ScreenCaptureService : Service() {
                         checkLiveStreamingPage_retry_count += 1
                         Log.d("checkInLiveStreamingPage", "直播頁面 沒找到 retry = $checkLiveStreamingPage_retry_count ")
                     }
-                    if (checkLiveStreamingPage_retry_count > 6) {
+                    if (checkLiveStreamingPage_retry_count > 5) {
                         checkLiveStreamingPage_retry_count = 0
                         notInLiveStreamingPage_reopen_request = true
                     }
