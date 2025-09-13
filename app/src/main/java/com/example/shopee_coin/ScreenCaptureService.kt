@@ -869,8 +869,8 @@ class ScreenCaptureService : Service() {
 
         val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-        val regex3 = Regex("^[領领須须後铁]取")
-        val regex4 = Regex("^[重童垂][試拭詩]")
+        val regex3 = Regex("^\\|?\\(?[領领須须後铁]取")
+        val regex4 = Regex("^\\|?\\(?[重童垂][試拭詩]")
         //val regex5 = Regex("已結束")
 
         var Coin_Position_x  = 0f
