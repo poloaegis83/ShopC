@@ -19,7 +19,7 @@ object GlobalValueHolder {
     var DownValue: Float = 0f
     var IsLowEndDevice by mutableStateOf(false)
     var StartHour: Int = 8
-    var StartMinute: Int = 30
+    var StartMinute: Int = 0
     var EndHour: Int = 0
     var EndMinute: Int = 0
     var IsTimeLimit by mutableStateOf(false)
