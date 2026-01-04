@@ -697,6 +697,10 @@ class ScreenCaptureService : Service() {
         var positionYGetCoinButton = 0f
         var positionYGAP = 0f
 
+        var m_national_check = 0
+
+        val regex13 = Regex("[確碓确碩][認詔定足疋忍]")
+        val regex12 = Regex("[國圍園團][家冢豪象].{2}[報執]")
         val regex11 = Regex("[關关][注主]")
         val regex10 = Regex("現在就.?[主王][播搔波插搂]")
         val regex9 = Regex("[您恁你][獲获攥瓉穫狗猹獠][得徳德陽律很傷]\\s*([0-9](?:\\.[0-9]{1,2})?)\\s*[蝦轄遐]")
@@ -726,6 +730,13 @@ class ScreenCaptureService : Service() {
                     val matches9 = regex9.find(line.text)
                     val matches10 = regex10.find(line.text)
                     val matches11 = regex11.find(line.text)
+                    val matches12 = regex12.find(line.text)
+                    var matches13: MatchResult? = null
+
+                    if (m_national_check == 1) {
+                        matches13 = regex13.find(line.text)
+                    }
+
 
                     Log.d("OCR_Line", "文字內容：${line.text}")
                     //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
@@ -823,6 +834,17 @@ class ScreenCaptureService : Service() {
                         line.boundingBox?.let { box ->
                             touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
                         }
+                    }
+                    if (matches12 != null) {
+                        Log.d("find", "警報")
+                        m_national_check = 1
+                    }
+                    if (m_national_check == 1 && matches13 != null) {
+                        Log.d("find", "警報 點級")
+                        line.boundingBox?.let { box ->
+                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                        }
+                        m_national_check = 0
                     }
                 }
             }
