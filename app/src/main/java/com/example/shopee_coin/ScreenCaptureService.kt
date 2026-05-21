@@ -691,12 +691,12 @@ class ScreenCaptureService : Service() {
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
         recognizeTextAndHandleGesture(cutBitmapHalf, this) { resultText ->
-            processEventCase(resultText)
+            processEventCase(resultText, bitmap.height)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun processEventCase(resultText: Text) {
+    private fun processEventCase(resultText: Text, screenshotHeight: Int) {
         var positionYGetCoinButton = 0f
         var positionYGAP = 0f
         var m_national_check = 0
@@ -761,7 +761,8 @@ class ScreenCaptureService : Service() {
                             coinValueFind = true
                             
                             Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
-                            positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!, 1)
+                            // cropToVerticalMiddleTwo 的頂部偏移是高度的 1/4
+                            positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!, screenshotHeight.toFloat() / 4f)
                         }
 
                         if (matches1 != null) {
@@ -773,10 +774,11 @@ class ScreenCaptureService : Service() {
                                 floatingService?.updateRecordTextToday()
                             }
                             
-                            positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!, 1) - positionYGetCoinButton
+                            val currentY = realY(line.boundingBox?.bottom?.toFloat()!!, screenshotHeight.toFloat() / 4f)
+                            positionYGAP = currentY - positionYGetCoinButton
                             if (positionYGetCoinButton == 0f) positionYGAP = 98f
 
-                            val clickY = realY(line.boundingBox?.bottom?.toFloat()!!, 1) + positionYGAP * 1.5f + gTotalHeight / 4
+                            val clickY = currentY + positionYGAP * 1.5f + gTotalHeight / 4
                             serviceScope.launch {
                                 MoveActionMutex.withLock {
                                     touchClick(metrics.widthPixels / 2f, clickY)
@@ -837,7 +839,7 @@ class ScreenCaptureService : Service() {
         val cutBitmap = BitmapCropLib.cropToTopRightQuarter(bitmap)
 
         recognizeTextAndHandleGesture(cutBitmap, this) { resultText ->
-            processCoinCase(resultText)
+            processCoinCase(resultText, bitmap.width)
         }
     }
 
@@ -850,14 +852,17 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    private fun realY (inputY: Float, Phase: Int): Float{
-        var realY = 0f
-        if ( Phase == 1 ) {
-            realY = inputY + gHeightOffset/3
-        } else if ( Phase == 2 ) {
-            realY = inputY + gHeightOffset/3
-        }
-        return realY
+    private fun realY(inputY: Float, cropTopOffset: Float): Float {
+        // 1. 還原到完整截圖的 Y 座標
+        val yInFullScreenshot = inputY + cropTopOffset
+
+        // 2. 計算截圖與螢幕實體高度的比例 (以防系統做了自動縮放)
+        val screenHeight = metrics.heightPixels.toFloat()
+        val screenshotHeight = imageReader?.height?.toFloat() ?: screenHeight
+        val scaleY = screenHeight / screenshotHeight
+
+        // 3. 加上狀態列偏移 (gHeightOffset)
+        return (yInFullScreenshot * scaleY) + gHeightOffset
     }
     var gFindCoinButNoTime = 0
 
@@ -868,7 +873,7 @@ class ScreenCaptureService : Service() {
 
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun processCoinCase(resultText: Text) {
+    private fun processCoinCase(resultText: Text, screenshotWidth: Int) {
 
         val regex1 = Regex("([0-1]\\.\\d{1,2}|[1])")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
@@ -922,10 +927,11 @@ class ScreenCaptureService : Service() {
 
                                         if (isBelowHeader && isWithinHorizontalBounds) {
                                             Log.d("CoinValue", "第二階段：找到符合位置關係的數字 ${matches1.value}")
-                                            Coin_Position_x = (boxc.centerX()).toFloat() + (metrics.widthPixels / 2f)
-                                            Coin_Position_y = realY((boxc.centerY()).toFloat(), 2)
-                                            Coin_Position_Top = realY(boxc.top.toFloat(), 2)
-                                            Coin_Position_Bottom = realY(boxc.bottom.toFloat(), 2)
+                                            // cropToTopRightQuarter 的 X 偏移是寬度的一半，Y 偏移是 0
+                                            Coin_Position_x = (boxc.centerX()).toFloat() + (screenshotWidth / 2f)
+                                            Coin_Position_y = realY((boxc.centerY()).toFloat(), 0f)
+                                            Coin_Position_Top = realY(boxc.top.toFloat(), 0f)
+                                            Coin_Position_Bottom = realY(boxc.bottom.toFloat(), 0f)
                                             Coin_Position_Height = boxc.height().toFloat()
 
                                             coinValueToRecord = matches1.value.toFloat()
@@ -954,7 +960,7 @@ class ScreenCaptureService : Service() {
                                 if (matches2 != null) {
                                     val boxt = line.boundingBox
                                     if (boxt != null) {
-                                        val timey = realY(boxt.top.toFloat(), 2)
+                                        val timey = realY(boxt.top.toFloat(), 0f)
                                         // 判斷時間是否在數字下方合理的範圍內
                                         if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f) {
                                             Log.d("RegexMatch", "第三階段：找到倒數時間 ${matches2.value} -> WAITING_COIN")
@@ -970,8 +976,8 @@ class ScreenCaptureService : Service() {
                             if (matches3 != null) {
                                 val boxg = line.boundingBox
                                 if (boxg != null) {
-                                    val GetCoin_Right_X = boxg.right.toFloat() + (metrics.widthPixels / 2f)
-                                    val GetCoin_Y = realY(boxg.centerY().toFloat(), 2)
+                                    val GetCoin_Right_X = boxg.right.toFloat() + (screenshotWidth / 2f)
+                                    val GetCoin_Y = realY(boxg.centerY().toFloat(), 0f)
 
                                     if (Coin_Position_x != 0f || nextState == CState.COIN_VAULE_FIND) {
                                         val isRightSide = GetCoin_Right_X > Coin_Position_x
@@ -1282,7 +1288,8 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/2f)  + 50f) && boxc.right > ((metrics.widthPixels/2f)  - 50f)) {
                                         Log.d("FindShopeeMainPage", "找到 直播短影音 in low 25% page  location right")
-                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(),2) + metrics.heightPixels * 0.75f
+                                        // cropToVerticalButton25percent 的 Y 偏移是高度的 0.75
+                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }
@@ -1296,7 +1303,8 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/3f) )) {
                                         Log.d("FindShopeeMainPage", "找到 蝦拼 in low 25% page  location right")
-                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(),2) + metrics.heightPixels * 0.75f
+                                        // cropToVerticalButton25percent 的 Y 偏移是高度的 0.75
+                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }
