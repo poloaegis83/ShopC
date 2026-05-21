@@ -662,9 +662,10 @@ class ScreenCaptureService : Service() {
             
             // 更新 Debug 訊息
             if (GlobalValueHolder.isDebugMode) {
-                val debugMsg = "Tofind(${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)})up\n" +
-                               "coin:$debugCoinPosValue\n" +
-                               "get:$debugGetPos\n" +
+                val debugMsg = "Goal(${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)})\n" +
+                               "CoinValue:$debugCoinPosValue\n" +
+                               "GetButton:$debugGetPos\n" +
+                               "Interval:$CallBack_Interval ms\n" +
                                "State:$CoinStates"
                 floatingService?.updateDebugInfo(debugMsg)
             }
@@ -807,7 +808,7 @@ class ScreenCaptureService : Service() {
                             Log.d("RegexMatch9", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
                             coinValueFind = true
-                            
+
                             Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
                             // cropToVerticalMiddleTwo 的頂部偏移是高度的 1/4
                             positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!, screenshotHeight.toFloat() / 4f)

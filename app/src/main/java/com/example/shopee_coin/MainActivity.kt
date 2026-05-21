@@ -357,25 +357,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 }
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(text = "進階選項")
-                
-                if (GlobalValueHolder.advanceSetting) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(15.dp)
-                            .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
-                        contentAlignment = Alignment.Center
-                    ){
-                        Checkbox(
-                            checked = GlobalValueHolder.isDebugMode,
-                            onCheckedChange = { checked ->
-                                GlobalValueHolder.isDebugMode = checked
-                            },
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(text = "Debug訊息", fontSize = 12.sp)
-                }
             }
 
             if (GlobalValueHolder.IsTimeLimit) {
@@ -493,6 +474,26 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     Text(text = "舊蝦模式",
                         fontSize = 12.sp
                     )
+                    
+                    // 將 Debug 訊息移動到舊蝦模式之後
+                    if (GlobalValueHolder.advanceSetting) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(15.dp)
+                                .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                            contentAlignment = Alignment.Center
+                        ){
+                            Checkbox(
+                                checked = GlobalValueHolder.isDebugMode,
+                                onCheckedChange = { checked ->
+                                    GlobalValueHolder.isDebugMode = checked
+                                },
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(text = "Debug訊息", fontSize = 12.sp)
+                    }
                 }
                 Row(
                     modifier = Modifier.padding(top = 6.dp),
