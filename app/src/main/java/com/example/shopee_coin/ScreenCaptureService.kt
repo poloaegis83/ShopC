@@ -129,6 +129,7 @@ class ScreenCaptureService : Service() {
     companion object {
         @Volatile var isRunning = false
             private set
+        @Volatile var lastState: CState = CState.COIN_START
     }
 
 
@@ -503,6 +504,7 @@ class ScreenCaptureService : Service() {
                     if (driveSuccess) {
                         liveStreamPageCorrection()
                     }
+                    lastState = CoinStates
 
                 } else if ( notInLiveStreamingPage_reopen_request) {
                     isDuringRestart = true
@@ -511,6 +513,7 @@ class ScreenCaptureService : Service() {
                     if (driveSuccess) {
                         liveStreamPageCorrection()
                     }
+                    lastState = CoinStates
                 }
             } finally {
                 isDuringRestart = false
@@ -1119,6 +1122,7 @@ class ScreenCaptureService : Service() {
                         stateLossCounter = 0 // 只要認到東西就重置
                     }
                     // ----------------------------
+                    lastState = CoinStates // 更新全域狀態供懸浮按鈕變色使用
 
                     // 第五階段：處理卡bug問題與換頁邏輯
                     if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
@@ -1535,7 +1539,7 @@ class ScreenCaptureService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private fun touchClick (X: Float, Y: Float) {
         val ACservice = MyAccessibilityService.instance
-        ACservice?.click(X, Y)
+        ACservice?.click(X, Y, randomized = true)
     }
 
     private fun cleanup() {

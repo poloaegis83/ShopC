@@ -123,10 +123,17 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    fun click(x: Float, y: Float) {
+    fun click(x: Float, y: Float, randomized: Boolean = false) {
+        var finalX = x
+        var finalY = y
+        if (randomized) {
+            finalX += (-3..3).random().toFloat()
+            finalY += (-3..3).random().toFloat()
+        }
+
         val path = Path().apply {
-            moveTo(x, y)
-            lineTo(x + 0.3f, y + 0.3f)  // 建議畫出 1px 的點擊動作
+            moveTo(finalX, finalY)
+            lineTo(finalX + 0.3f, finalY + 0.3f)
         }
 
         val stroke = GestureDescription.StrokeDescription(path, 0, 200)
@@ -134,7 +141,7 @@ class MyAccessibilityService : AccessibilityService() {
 
         val result = dispatchGesture(gesture, null, null)
         if (result) {
-            Log.d("MyAccessibilityService", "已執行點擊手勢：($x, $y)")
+            Log.d("MyAccessibilityService", "已執行點擊手勢：($finalX, $finalY)")
         } else {
             Log.e("MyAccessibilityService", "點擊手勢失敗")
         }

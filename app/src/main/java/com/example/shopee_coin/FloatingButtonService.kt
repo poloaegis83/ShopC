@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Binder
 import android.os.Handler
@@ -18,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import java.util.Calendar
 import kotlin.math.absoluteValue
@@ -200,6 +202,20 @@ class FloatingButtonService : Service() {
         Handler(Looper.getMainLooper()).post {
             statusText.text = text
             updateDebugVisibility()
+            updateBackgroundColor()
+        }
+    }
+
+    private fun updateBackgroundColor() {
+        if (!GlobalValueHolder.isOn) {
+            floatingView.setBackgroundColor(Color.parseColor("#888888")) // 暫停時用深灰色
+            return
+        }
+
+        if (ScreenCaptureService.lastState == ScreenCaptureService.CState.WAITING_COIN) {
+            floatingView.setBackgroundColor(Color.LTGRAY) // WAITING_COIN 用亮灰色
+        } else {
+            floatingView.setBackgroundColor(Color.parseColor("#888888")) // 其餘狀態用稍微深灰色
         }
     }
 
