@@ -27,6 +27,7 @@ object GlobalValueHolder {
     var isOn = false
     var notInTimeBcckToHere by mutableStateOf(false)
     var advanceSetting by mutableStateOf(false)
+    var isOldCompatibilityMode by mutableStateOf(false)
 }
 
 var isEnabledAcService = true

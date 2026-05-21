@@ -49,7 +49,6 @@ class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private val handler = Handler(Looper.getMainLooper())
-    private var AdaptiveGetCoinButtonY = 0f
     private val UpscaleRate = 2f
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -179,9 +178,9 @@ class ScreenCaptureService : Service() {
 
             return if (now - lastCallTime >= twoMinutesMillis) {
                 lastCallTime = now
-                false
-            } else {
                 true
+            } else {
+                false
             }
         }
     }
@@ -696,7 +695,6 @@ class ScreenCaptureService : Service() {
     private fun processEventCase(resultText: Text) {
         var positionYGetCoinButton = 0f
         var positionYGAP = 0f
-
         var m_national_check = 0
 
         val regex13 = Regex("[確碓确碩][認詔定足疋忍]")
@@ -752,64 +750,37 @@ class ScreenCaptureService : Service() {
                         findSubscribe = true
                     }
 
-                    if (matches9 != null && !coinValueFind) {
-                        Log.d("RegexMatch9", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
-                        if (RecordCionLimiter.canCall()){
-                            Log.d("RecordCionLimiter", "canCall()")
+                    if (GlobalValueHolder.isOldCompatibilityMode) {
+                        if (matches9 != null && !coinValueFind) {
+                            Log.d("RegexMatch9", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
                             coinValueFind = true
-
-                        }
-                        // Always update button location
-                        Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
-                        positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!,1)
-                        Log.d("Positon_Y_GetCoinButton", "positionYGetCoinButton --> ${positionYGetCoinButton}")
-                    }
-
-                    if (matches1 != null) {
-                        Log.d("RegexMatch", "找到  本場直播還可領取")
-                        if (coinValueFind && coinValue != 0f) {
-                            Log.d("RegexMatch", "ADDD coinClaimStorage coinValue = ${coinValue}")
-                            coinClaimStorage.addClaim(CoinClaim(amount = coinValue.toDouble()))
-                            coinValueFind = false
-                            floatingService?.updateRecordTextToday()
-                        }
-                        Log.d("line.boundingBox?.bottom?.toFloat()!!", "直播2 ${line.boundingBox?.bottom?.toFloat()!!}")
-                        positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!,1) - positionYGetCoinButton
-
-                        if (positionYGetCoinButton == 0f) {
-                            // 如果沒有 matches9 成功就不會有 positionYGAP, 直接給值
-                            positionYGAP = 98f
+                            
+                            Log.d("您獲得.top", " ${line.boundingBox?.top?.toFloat()!!}")
+                            positionYGetCoinButton = realY(line.boundingBox?.top?.toFloat()!!, 1)
                         }
 
-                        positionYGetCoinButton = realY(line.boundingBox?.bottom?.toFloat()!!,1) + positionYGAP *1.5f + gTotalHeight/4
-                        Log.d("Positon_Y_GetCoinButton222", "Positon_Y_GAP --> ${positionYGAP }, Positon_Y_GetCoinButton --> ${positionYGetCoinButton}")
-                        if (AdaptiveGetCoinButtonY == 0f || AdaptiveGetCoinButtonY >= (metrics.heightPixels - 90).toFloat() ) {
-                            // reset AdaptiveGetCoinButtonY 如果 等於0 或 太大
-                            Log.d("AdaptiveGetCoinButtonY", "reset AdaptiveGetCoinButtonY--> ${positionYGetCoinButton}")
-                            AdaptiveGetCoinButtonY = positionYGetCoinButton
-                        }
-
-                        val retry_gap = 10f
-
-                        if (CoinButtonLimiter.canCall()) {
-                            //
-                            // Only Adaptive Get Coin Button, triggered twice in 2 mins
-                            //
-                            if (AdaptiveGetCoinButtonY <= positionYGetCoinButton + positionYGAP ) {
-                                AdaptiveGetCoinButtonY += retry_gap
-                            } else {
-                                AdaptiveGetCoinButtonY -= 80f
+                        if (matches1 != null) {
+                            Log.d("RegexMatch", "找到  本場直播還可領取")
+                            if (coinValueFind && coinValue != 0f) {
+                                Log.d("RegexMatch", "ADDD coinClaimStorage coinValue = ${coinValue}")
+                                coinClaimStorage.addClaim(CoinClaim(amount = coinValue.toDouble()))
+                                coinValueFind = false
+                                floatingService?.updateRecordTextToday()
                             }
-                            Log.d("AdaptiveGetCoinButtonY update", "AdaptiveGetCoinButtonY update--> ${AdaptiveGetCoinButtonY}")
-                        }
-                        Log.d("AdaptiveGetCoinButtonY", "AdaptiveGetCoinButtonY --> ${AdaptiveGetCoinButtonY}")
-                        serviceScope.launch {
-                            MoveActionMutex.withLock {
-                                GetCoinButton(metrics.widthPixels / 2f, AdaptiveGetCoinButtonY)
+                            
+                            positionYGAP = realY(line.boundingBox?.bottom?.toFloat()!!, 1) - positionYGetCoinButton
+                            if (positionYGetCoinButton == 0f) positionYGAP = 98f
+
+                            val clickY = realY(line.boundingBox?.bottom?.toFloat()!!, 1) + positionYGAP * 1.5f + gTotalHeight / 4
+                            serviceScope.launch {
+                                MoveActionMutex.withLock {
+                                    touchClick(metrics.widthPixels / 2f, clickY)
+                                }
                             }
                         }
                     }
+
                     if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
                         Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
                         PlatformBackGesture()
@@ -857,8 +828,9 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleCoinCase(bitmap: Bitmap) {
-
-        val cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
+        // 處理硬幣案例：擴大裁切範圍至右上角 1/4，以確保能完整捕捉硬幣影像
+        //val cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
+        val cutBitmap = BitmapCropLib.cropToTopRightQuarter(bitmap)
 
         recognizeTextAndHandleGesture(cutBitmap, this) { resultText ->
             processCoinCase(resultText)
@@ -885,175 +857,196 @@ class ScreenCaptureService : Service() {
     }
     var gFindCoinButNoTime = 0
 
+
+    //第一階段  for (line in block.lines)  確認 "直播間蝦幣"  存在 紀錄flag
+    //第二階段 for (line in block.lines)   "直播間蝦幣"  存在 flag = true, 確認 蝦幣數字 (CoinValue) 同時存在
+    //第三階段 領取按鈕 與 處理時間倒數
+
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
     private fun processCoinCase(resultText: Text) {
 
-        val regex1 = Regex("(^\\(\\d\$)|(^\\d\$)|(\\d\\.\\d{1,2})")
+        val regex1 = Regex("([0-1]\\.\\d{1,2}|[1])")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
-        val regex3 = Regex("^\\|?\\(?[領领須须後铁]取")
+        val regex3 = Regex("[領领須须後铁]取")
         val regex4 = Regex("^\\|?\\(?[重童垂][試拭詩]")
-        //val regex5 = Regex("已結束")
+        val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
+        val regex6 = Regex("[蝦轄遐].[直置真百].[任住低低仟伴尫彺往仁].[獎賞]") //蝦皮直播任務獎歷
 
         var Coin_Position_x  = 0f
         var Coin_Position_y  = 0f
+        var Coin_Position_Top = 0f
+        var Coin_Position_Bottom = 0f
         var Coin_Position_Height  = 0f
-
+        var coinValueToRecord = 0f
+        var findLiveCoinHeader = false
         CoinStates = CState.SEARCHING_COIN
-
                 try {
-                    OuterReg@ for (block in resultText.textBlocks) {
+                    var headerBox: android.graphics.Rect? = null
+
+                    for (block in resultText.textBlocks) {
+                        // 第一階段：確認 "直播間蝦幣" or "蝦皮直播任務獎歷" 是否存在
                         for (line in block.lines) {
-                            Log.d("OCR_Line", "文字內容：${line.text}")
-                            //Log.d("OCR_Line", "文字位置：${line.boundingBox}")
-                            val matches1 = regex1.find(line.text)
-                            if (matches1 != null  && last_notZero(matches1.value)) {
-                                Log.d("RegexMatch", "找到Coin：${matches1.value}")
-                                Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                val CoinValue = matches1.value.toFloat()
-                                Log.d("CoinValue", "CoinValue：${CoinValue}")
-                                //CoinValueShows = 1
-                                val boxc = line.boundingBox
-                                if (boxc != null) {
-                                    //Coin_Position_x = (boxc.centerX()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
-                                    //Coin_Position_y = (boxc.centerY()).toFloat() / UpscaleRate   // 縮放 with UpscaleRate
-                                    Coin_Position_x = (boxc.centerX()).toFloat()
-                                    Coin_Position_y = realY ((boxc.centerY()).toFloat(),2)
-                                    Coin_Position_Height = boxc.height().toFloat()
-                                    Log.d("CoinValue", "boxc.bottom：${boxc.bottom} , boxc.top：${boxc.top}, boxc.centerY() ${boxc.centerY()} ,  height: = ${boxc.height()}")
-
-                                    Coin_Position_x += (metrics.widthPixels / 2f) + (metrics.widthPixels / 4f)   // X 只有 1/2 + 1/4 必須加位置
-                                    //Coin_Position_x += (metrics.widthPixels / 2f)
-                                    //Coin_Position_y += (metrics.heightPixels / 8f)   // Y 必須加 1/8 位置
-                                    Log.d("CoinValue p", "(boxc.centerX()).toFloat()：${(boxc.centerX()).toFloat()}  metrics.widthPixels / 2f：${metrics.widthPixels / 2f}")
-                                    Log.d("CoinValue p", "Coin_Position_x：${Coin_Position_x}  Coin_Position_y：${Coin_Position_y}")
-                                    //CoinStates = CState.COIN_VAULE_FIND
-                                }
-
-                                if (CoinValue >= CoinValueSatisfy ){
-                                    Log.d("CoinValue p", "Coin COIN_VAULE_FIND  滿足")
-                                    CoinStates = CState.COIN_VAULE_FIND
-                                    NotFindConter = 0
-                                }
-                            }
-
-                           // val matches5 = regex5.find(line.text)
-                           // if (matches5 != null) {
-                           //     Log.d("RegexMatch", "已結束")
-                           //     serviceScope.launch {
-                           //         moveNextPage()
-                           //     }
-                           // }
-
-                            val matches3 = regex3.find(line.text)
-                            if( matches3 != null) {
-                                val boxg = line.boundingBox
-                                if (boxg != null) {
-
-                                    if ( realY(boxg.centerY().toFloat(),2) - Coin_Position_y >= 250f) {
-                                        // 領取與差距Coin_Position_y不對 250
-                                        // 強制給一個 Coin_Position_y
-                                        Coin_Position_y = realY(boxg.centerY().toFloat(),2) - 55f
-                                        Log.d("強制給一個 Coin_Position_y", "領取與差距Coin_Position_y不對 250")
-                                    }
-                                    if ( realY(boxg.centerY().toFloat(),2) >= Coin_Position_y) {  //check Get Coin Low Than Value  確保領取是比 coin 數字低
-                                        Log.d("RegexMatch", "找到Coin 領取：${matches3.value}")
-                                        Log.d("OCR_Line boxg", "位置centerY：${boxg.centerY().toFloat()}")
-                                        CoinStates = CState.GET_COIN_READY
-                                        gFindCoinButNoTime = 0
-                                        floatingService?.resetFloatButtonLocation()
-                                        if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                                            Log.d("點螢幕", "位置：${Coin_Position_x} , ${Coin_Position_y}")
-                                            touchClick(Coin_Position_x, Coin_Position_y)
-                                        }
-                                        break@OuterReg
-                                    } else {
-                                        Log.d("RegexMatch", "找到Coin 領取：${matches3.value}  但沒有比較低")
-                                    }
-                                }
-                            }
-
-                            if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                               val matches2 = regex2.find(line.text)
-                                 if (matches2 != null) {
-                                    Log.d("OCR_Line", "Coin T位置：${line.boundingBox}")
-                                    val boxt = line.boundingBox
-                                    if ( boxt != null){
-                                        //val timex = boxt.centerX().toFloat()
-                                        val timey = realY( boxt.top.toFloat(),2)
-                                        Log.d("OCR_Line", "Coin T位置 timey：${timey}")
-                                        if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f ) {
-                                            //
-                                            // Check Coin Time 位置
-                                            //
-                                            Log.d("RegexMatch", "找到Coin Time：${matches2.value}")
-                                            //Log.d("OCR_Line", "位置：${line.boundingBox}")
-                                            gFindCoinButNoTime = 0
-
-                                            Log.d("CoinStates", "CoinStates：${CoinStates}")
-                                            if(CoinStates == CState.COIN_VAULE_FIND) {
-                                                //
-                                                // 有時間才算找到
-                                                //
-                                                Log.d("RegexMatch", "有時間才算找到")
-                                                CoinStates = CState.WAITING_COIN
-                                                break@OuterReg
-                                            }
-                                        }
-                                    }
-                                 }
-
-                                val matches4 = regex4.find(line.text) //重試
-                                if (matches4 != null) {
-                                    Log.d("move", "重試 with QuickRefreshPage")
-                                    serviceScope.launch {
-                                        MoveActionMutex.withLock {
-                                            QuickRefreshPage()
-                                        }
-                                    }
-                                    gFindCoinButNoTime = 0
-                                    CoinStates = CState.SEARCHING_COIN
-
-                                    checkLiveStreamingPage_retry_count = 0
-                                    break@OuterReg
-                                }
-                            }
-
-                            if (CoinStates == CState.COIN_VAULE_FIND) {
-                                Log.d("CoinStates", "CState.COIN_VAULE_FIND")
-                            } else {
-                                //
-                                // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
-                                //
-                                //if (matches2 != null){
-                                //   if (CoinValueShows == 0) {
-                                //        CoinStates = CState.WAITING_COIN
-                               //         Log.d("RegexMatchWA", "RegexMatch WA 找到時間 但沒有 coin value")
-                               //     }
-                               //     break@OuterReg
-                                //}
-                                //
-                                // W/A for Coin value = 1, 找到時間 但沒有 coin value, assume it is 1
-                                //
-                                CoinStates = CState.PAGE_COIN_NOT_FIND
+                            Log.d("CoinValue", "第一階段文字：${line.text}")
+                            if (regex5.find(line.text) != null || regex6.find(line.text) != null  ) {
+                                findLiveCoinHeader = true
+                                headerBox = line.boundingBox
+                                Log.d("CoinValue", "第一階段：找到直播間蝦幣標題，位置：$headerBox")
+                                break
                             }
                         }
                     }
 
-                    //
-                    // 找到coin 但沒時間 Fix with QuickRefreshPage
-                    //
+                    for (block in resultText.textBlocks) {
+                        // 第二階段：若標題存在，尋找 蝦幣數字 (CoinValue) 並記錄位置
+                        if (findLiveCoinHeader && headerBox != null) {
+                            for (line in block.lines) {
+                                Log.d("CoinValue", "第二階段文字：${line.text}")
+                                val matches1 = regex1.find(line.text)
+                                if (matches1 != null && last_notZero(matches1.value)) {
+                                    val boxc = line.boundingBox
+                                    if (boxc != null) {
+                                        // 💡 空間過濾邏輯：
+                                        // 1. 數字的中心 Y 必須大於 標題的 Y (在標題下方)
+                                        // 2. 數字的中心 X 必須落在 標題的 左右範圍內 (水平對齊)
+                                        val currentHeader = headerBox!!
+                                        val isBelowHeader = boxc.centerY() > currentHeader.centerY()
+                                        val isWithinHorizontalBounds = boxc.centerX() >= currentHeader.left && boxc.centerX() <= currentHeader.right
+                                        headerBox = boxc
+                                        Log.d("CoinValue", "第一階段 L R：，位置L：${currentHeader.left}, 位置R：${currentHeader.right}")
+                                        Log.d("CoinValue", "第二階段：，位置：$headerBox, CX ${boxc.centerX()} XY ${boxc.centerY()}")
+
+                                        if (isBelowHeader && isWithinHorizontalBounds) {
+                                            Log.d("CoinValue", "第二階段：找到符合位置關係的數字 ${matches1.value}")
+                                            Coin_Position_x = (boxc.centerX()).toFloat() + (metrics.widthPixels / 2f)
+                                            Coin_Position_y = realY((boxc.centerY()).toFloat(), 2)
+                                            Coin_Position_Top = realY(boxc.top.toFloat(), 2)
+                                            Coin_Position_Bottom = realY(boxc.bottom.toFloat(), 2)
+                                            Coin_Position_Height = boxc.height().toFloat()
+
+                                            coinValueToRecord = matches1.value.toFloat()
+                                            Log.d("CoinValue", "門檻：$CoinValueSatisfy")
+                                            if (coinValueToRecord >= CoinValueSatisfy) {
+                                                Log.d("CoinValue", "符合門檻：$coinValueToRecord >= $CoinValueSatisfy")
+                                                CoinStates = CState.COIN_VAULE_FIND
+                                                NotFindConter = 0
+                                            }
+                                        } else {
+                                            Log.d("CoinValue", "忽略位置不符的數字: ${matches1.value} (Below: $isBelowHeader, Horizontal: $isWithinHorizontalBounds)")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var isLoopBroken = false
+
+                    // 第三階段：處理「領取」按鈕 與 處理時間倒數
+                    OuterReg@ for (block in resultText.textBlocks) {
+                        for (line in block.lines) {
+                            Log.d("OCR_Line", "第三階段文字：${line.text}")
+
+                            // 1. 處理「領取」按鈕
+                            val matches3 = regex3.find(line.text)
+                            if (matches3 != null) {
+                                Log.d("OCR_Line", "領取」按鈕：${line.text}")
+
+                                val boxg = line.boundingBox
+                                if (boxg != null) {
+                                    // 💡 針對 "03 領取" 這種合併行進行優化
+                                    // 使用 boxg.right 來判斷按鈕是否在 Coin 數字右邊 (因為領取二字一定在該行最右側)
+                                    val GetCoin_Right_X = boxg.right.toFloat() + (metrics.widthPixels / 2f)
+                                    val GetCoin_Y = realY(boxg.centerY().toFloat(), 2)
+                                    Log.d("OCR_Line", "領取」按鈕1 ${Coin_Position_x} , ${CoinStates}")
+                                    if (Coin_Position_x != 0f || CoinStates == CState.COIN_VAULE_FIND) {
+                                        Log.d("OCR_Line", "領取」按鈕2")
+                                        // 判斷按鈕右邊界是否大於 Coin 數字座標
+                                        val isRightSide = GetCoin_Right_X > Coin_Position_x
+                                        val tolerance = Coin_Position_Height * 0.3f
+                                        val isWithinYRange = GetCoin_Y >= (Coin_Position_Top - tolerance) && GetCoin_Y <= (Coin_Position_Bottom + tolerance)
+                                        Log.d("OCR_Line", "isRightSide ${isRightSide }, tolerance = ${tolerance},isWithinYRange = ${isWithinYRange} " )
+                                        if (isRightSide && isWithinYRange) {
+                                            Log.d("RegexMatch", "符合過濾條件的領取按鈕：${matches3.value}")
+                                            CoinStates = CState.GET_COIN_READY
+                                            gFindCoinButNoTime = 0
+                                            floatingService?.resetFloatButtonLocation()
+                                            
+                                            // 💡 點擊位置優化：點擊在該行「中心點與右邊界之間」
+                                            // 這樣可以確保點到右側的「領取」按鈕，避開左側可能的數字 (如 03)
+                                            val targetClickX = (boxg.centerX() + boxg.right) / 2f + (metrics.widthPixels / 2f)
+                                            
+                                            Log.d("點螢幕", "點擊座標 (優化點擊右側)：$targetClickX , $GetCoin_Y (RawLine: ${line.text})")
+                                            touchClick(targetClickX, GetCoin_Y)
+
+                                            if (coinValueToRecord > 0f) {
+                                                if (RecordCionLimiter.canCall()) {
+                                                    Log.d("RegexMatch", "符合時間間隔，記錄蝦幣 coinValue = $coinValueToRecord")
+                                                    coinClaimStorage.addClaim(CoinClaim(amount = coinValueToRecord.toDouble()))
+                                                    floatingService?.updateRecordTextToday()
+                                                } else {
+                                                    Log.d("RegexMatch", "領取點擊成功，但處於冷卻期，不重複記錄數值")
+                                                }
+                                            }
+
+                                            serviceScope.launch { delay(3000L) }
+                                            isLoopBroken = true
+                                            break@OuterReg
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. 處理倒數時間
+                            if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                                val matches2 = regex2.find(line.text)
+                                if (matches2 != null) {
+                                    val boxt = line.boundingBox
+                                    if (boxt != null) {
+                                        val timey = realY(boxt.top.toFloat(), 2)
+                                        if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f) {
+                                            Log.d("RegexMatch", "找到倒數時間：${matches2.value}")
+                                            gFindCoinButNoTime = 0
+                                            if (CoinStates == CState.COIN_VAULE_FIND) {
+                                                Log.d("CoinStates", "滿足數字且有時間 -> WAITING_COIN")
+                                                CoinStates = CState.WAITING_COIN
+                                                isLoopBroken = true
+                                                break@OuterReg
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 3. 處理重試按鈕
+                                val matches4 = regex4.find(line.text)
+                                if (matches4 != null) {
+                                    Log.d("move", "找到重試 -> QuickRefreshPage")
+                                    serviceScope.launch {
+                                        MoveActionMutex.withLock { QuickRefreshPage() }
+                                    }
+                                    gFindCoinButNoTime = 0
+                                    CoinStates = CState.SEARCHING_COIN
+                                    isLoopBroken = true
+                                    break@OuterReg
+                                }
+                            }
+                        }
+                    }
+
+                    if (!isLoopBroken && CoinStates != CState.COIN_VAULE_FIND && CoinStates != CState.WAITING_COIN && CoinStates != CState.GET_COIN_READY) {
+                        Log.d("CoinStates", "CoinStates  ：${CoinStates}  , isLoopBroken ${isLoopBroken}")
+                        CoinStates = CState.PAGE_COIN_NOT_FIND
+                    }
+
                     if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
+                        Log.d("CoinStates", "Coin_Position_x  ：${Coin_Position_x}  , Coin_Position_y ${Coin_Position_y}")
                         FindCoinButNoTimeHandler()
                     }
 
                     GetCoinFreezeHandler()
                     NotFindCoinHandler()
                     Log.d("gIsCapturing", "IsCapturing = false")
-
-                } finally {
-
-                }
+                } finally { }
 
     }
 

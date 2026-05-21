@@ -345,6 +345,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 GlobalValueHolder.IsLowEndDevice = false
                                 GlobalValueHolder.appCheckRestartFeature = false
                                 GlobalValueHolder.notInTimeBcckToHere = false
+                                GlobalValueHolder.isOldCompatibilityMode = false
                             }
                         },
                     )
@@ -447,6 +448,28 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         fontSize = 12.sp // 自訂字體大小
                     )
 
+                }
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = GlobalValueHolder.isOldCompatibilityMode,
+                            onCheckedChange = { checked ->
+                                GlobalValueHolder.isOldCompatibilityMode = checked
+                            },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(1.dp))
+                    Text(text = "舊蝦模式",
+                        fontSize = 12.sp
+                    )
                 }
                 Row(
                     modifier = Modifier.padding(top = 6.dp),
