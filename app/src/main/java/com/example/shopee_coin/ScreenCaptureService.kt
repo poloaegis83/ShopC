@@ -106,6 +106,7 @@ class ScreenCaptureService : Service() {
     private var debugUpValue = 0f
     private var debugDownValue = 0f
     private var debugLineText = ""
+    private var debugLineVal = ""
 
     private var floatingService: FloatingButtonService? = null
     private var isBound = false
@@ -649,6 +650,7 @@ class ScreenCaptureService : Service() {
         debugCoinPosValue = "Non"
         debugGetPos = "Non"
         debugLineText = ""
+        debugLineVal = ""
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
         val image = imageReader?.acquireLatestImage()
@@ -679,14 +681,17 @@ class ScreenCaptureService : Service() {
             if (GlobalValueHolder.isDebugMode) {
                 var debugMsg = "Goal:${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)} " +
                                "(Up:${String.format(java.util.Locale.US, "%.1f", debugUpValue)} " +
-                               "Down:${String.format(java.util.Locale.US, "%.1f", debugDownValue)})\n" +
-                               "Period($debugPeriodInfo)\n" +
-                               "CoinValue:$debugCoinPosValue\n" +
-                               "GetButton:$debugGetPos\n" +
-                               "Interval:$CallBack_Interval ms\n" +
-                               "State:$CoinStates"
+                               "Dn:${String.format(java.util.Locale.US, "%.1f", debugDownValue)})\n" +
+                               "Peri($debugPeriodInfo)\n" +
+                               "CoinVal:$debugCoinPosValue\n" +
+                               "GetBtn:$debugGetPos\n" +
+                               "Intv:$CallBack_Interval ms\n" +
+                               "Sta:$CoinStates"
                 if (debugLineText.isNotEmpty()) {
                     debugMsg += "\nTxt:$debugLineText"
+                }
+                if (debugLineVal.isNotEmpty()) {
+                    debugMsg += "\nVal:$debugLineVal"
                 }
                 floatingService?.updateDebugInfo(debugMsg)
             }
@@ -1002,6 +1007,7 @@ class ScreenCaptureService : Service() {
                                             // 更新 Debug 資訊
                                             debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
                                             debugLineText = line.text
+                                            debugLineVal = matches1.value
 
                                             if (coinValueToRecord >= CoinValueSatisfy) {
                                                 Log.d("CoinValue", "符合門檻：$coinValueToRecord >= $CoinValueSatisfy")
