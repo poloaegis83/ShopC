@@ -147,19 +147,22 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         // MediaProjection 的權限 in 另一個 activity
         //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
 
-        val (realHeight, availableHeight) = getScreenHeights(this)
-        Log.d("ScreenHeight", "實體高度: $realHeight, 可用高度: $availableHeight")
-
-        val NavigationBarHeight =  getNavigationBarHeight(this)
-        Log.d("NavigationBarHeight", "NavigationBarHeight: $NavigationBarHeight")
-
-        gTotalHeight = realHeight.toFloat()
-        if (NavigationBarHeight == 0) {
-            gHeightOffset = (realHeight - availableHeight).toFloat()
-
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val (realWidth, realHeight) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = windowManager.currentWindowMetrics
+            val bounds = metrics.bounds
+            bounds.width() to bounds.height()
         } else {
-            gHeightOffset = (realHeight - NavigationBarHeight - availableHeight).toFloat()
+            val displayMetrics = DisplayMetrics()
+            windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+            displayMetrics.widthPixels to displayMetrics.heightPixels
         }
+
+        gTotalWidth = realWidth.toFloat()
+        gTotalHeight = realHeight.toFloat()
+        gHeightOffset = 0f // 既然採用全螢幕擷取，不再需要補償偏移
+
+        Log.d("ScreenSize", "實體解析度: ${realWidth}x${realHeight}")
 
         coinStorage = CoinClaimStorage(this)
 

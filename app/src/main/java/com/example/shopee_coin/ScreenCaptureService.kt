@@ -254,9 +254,12 @@ class ScreenCaptureService : Service() {
     }
 
     private fun setupVirtualDisplay() {
-        val width = Resources.getSystem().displayMetrics.widthPixels
-        val height = Resources.getSystem().displayMetrics.heightPixels
-        val density = Resources.getSystem().displayMetrics.densityDpi
+        // 使用螢幕真實實體尺寸，確保 1:1 像素映射
+        val width = gTotalWidth.toInt().takeIf { it > 0 } ?: metrics.widthPixels
+        val height = gTotalHeight.toInt().takeIf { it > 0 } ?: metrics.heightPixels
+        val density = metrics.densityDpi
+
+        Log.d("ScreenCaptureService", "建立 1:1 虛擬顯示: ${width}x${height}")
 
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -269,7 +272,6 @@ class ScreenCaptureService : Service() {
             null,
             null
         )
-
     }
 
     private var captureJob: Job? = null
@@ -899,16 +901,9 @@ class ScreenCaptureService : Service() {
     }
 
     private fun realY(inputY: Float, cropTopOffset: Float): Float {
-        // 1. 還原到完整截圖的 Y 座標
-        val yInFullScreenshot = inputY + cropTopOffset
-
-        // 2. 計算截圖與螢幕實體高度的比例 (以防系統做了自動縮放)
-        val screenHeight = metrics.heightPixels.toFloat()
-        val screenshotHeight = imageReader?.height?.toFloat() ?: screenHeight
-        val scaleY = screenHeight / screenshotHeight
-
-        // 3. 加上狀態列偏移 (gHeightOffset)
-        return (yInFullScreenshot * scaleY) + gHeightOffset
+        // 既然採用 1:1 全螢幕擷取，且截圖已包含狀態列，
+        // 真實座標 = 局部 OCR 座標 + 裁切位移
+        return inputY + cropTopOffset
     }
     var gFindCoinButNoTime = 0
 

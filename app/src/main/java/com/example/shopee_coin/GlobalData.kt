@@ -35,6 +35,7 @@ object GlobalValueHolder {
 var isEnabledAcService = true
 var gHeightOffset: Float = 0.0f
 var gTotalHeight: Float = 0.0f
+var gTotalWidth: Float = 0.0f
 
 data class CoinClaim(
     val amount: Double,
