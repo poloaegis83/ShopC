@@ -701,6 +701,8 @@ class ScreenCaptureService : Service() {
         var positionYGAP = 0f
         var m_national_check = 0
 
+        val regex15 = Regex("^[提媞堤隄瑅捷碍][領领須须後铁]") //提領按鈕
+        val regex14 = Regex("[待徍诗侍倚恃律][提媞堤隄瑅捷碍][領领須须後铁][蝦轄遐].") //待提領蝦幣
         val regex13 = Regex("[確碓确碩][認詔定足疋忍]")
         val regex12 = Regex("[國圍園團][家冢豪象].{2}[報執]")
         val regex11 = Regex("[關关][注主]")
@@ -718,7 +720,34 @@ class ScreenCaptureService : Service() {
         var coinValue = 0f
         var findSubscribe = false
 
+        var foundRegex14 = false
+        var regex15Box: android.graphics.Rect? = null
+
         try {
+            // 先掃描一遍尋找 regex14 和 regex15
+            for (block in resultText.textBlocks) {
+                for (line in block.lines) {
+                    if (regex14.find(line.text) != null) foundRegex14 = true
+                    if (regex15.find(line.text) != null) {
+                        regex15Box = line.boundingBox
+                    }
+                }
+            }
+
+            // 如果同時滿足條件，執行點擊、延遲 4 秒後返回
+            if (foundRegex14 && regex15Box != null) {
+                Log.d("processEventCase", "符合特殊任務條件：找到 regex14 並偵測到 regex15 按鈕位置")
+                //val clickX = regex15Box.centerX().toFloat()
+                //val clickY = realY(regex15Box.centerY().toFloat(), screenshotHeight.toFloat() / 4f)
+                
+                serviceScope.launch {
+                    //touchClick(clickX, clickY)
+                    delay(4000L)
+                    PlatformBackGesture()
+                }
+                return // 中斷後續一般處理
+            }
+
             for (block in resultText.textBlocks) {
                 for (line in block.lines) {
                     val matches1 = regex1.find(line.text)
