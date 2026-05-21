@@ -346,6 +346,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 GlobalValueHolder.appCheckRestartFeature = false
                                 GlobalValueHolder.notInTimeBcckToHere = false
                                 GlobalValueHolder.isOldCompatibilityMode = false
+                                GlobalValueHolder.isDebugMode = false
                             }
                         },
                     )
@@ -353,6 +354,25 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 }
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(text = "進階選項")
+                
+                if (GlobalValueHolder.advanceSetting) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                        contentAlignment = Alignment.Center
+                    ){
+                        Checkbox(
+                            checked = GlobalValueHolder.isDebugMode,
+                            onCheckedChange = { checked ->
+                                GlobalValueHolder.isDebugMode = checked
+                            },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(text = "Debug訊息", fontSize = 12.sp)
+                }
             }
 
             if (GlobalValueHolder.IsTimeLimit) {

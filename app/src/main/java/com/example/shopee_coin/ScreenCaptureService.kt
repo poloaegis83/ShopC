@@ -99,6 +99,10 @@ class ScreenCaptureService : Service() {
 
     var waiting_live_checker = false
 
+    // Debug 資訊變數
+    private var debugCoinPosValue = "Non"
+    private var debugGetPos = "Non"
+
     private var floatingService: FloatingButtonService? = null
     private var isBound = false
 
@@ -624,6 +628,10 @@ class ScreenCaptureService : Service() {
 
         Log.d("captureScreenFrame", "GO")
         gIsCapturing = true
+        
+        // 重置 Debug 資訊
+        debugCoinPosValue = "Non"
+        debugGetPos = "Non"
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
         val image = imageReader?.acquireLatestImage()
@@ -649,6 +657,15 @@ class ScreenCaptureService : Service() {
         } finally {
             bitmap?.recycle()  // 安全回收
             image.close()      // 永遠記得關掉 Image buffer
+            
+            // 更新 Debug 訊息
+            if (GlobalValueHolder.isDebugMode) {
+                val debugMsg = "Tofind(${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)})up\n" +
+                               "coin:$debugCoinPosValue\n" +
+                               "get:$debugGetPos\n" +
+                               "State:$CoinStates"
+                floatingService?.updateDebugInfo(debugMsg)
+            }
         }
 
         gIsCapturing = false
@@ -964,6 +981,9 @@ class ScreenCaptureService : Service() {
                                             Coin_Position_Height = boxc.height().toFloat()
 
                                             coinValueToRecord = matches1.value.toFloat()
+                                            
+                                            // 更新 Debug 資訊
+                                            debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
 
                                             if (coinValueToRecord >= CoinValueSatisfy) {
                                                 Log.d("CoinValue", "符合門檻：$coinValueToRecord >= $CoinValueSatisfy")
@@ -1015,11 +1035,15 @@ class ScreenCaptureService : Service() {
 
                                         if (isRightSide && isWithinYRange) {
                                             Log.d("RegexMatch", "第四階段：找到領取按鈕 -> GET_COIN_READY")
+                                            
+                                            val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
+                                            // 更新 Debug 資訊
+                                            debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
+
                                             nextState = CState.GET_COIN_READY
                                             gFindCoinButNoTime = 0
                                             floatingService?.resetFloatButtonLocation()
 
-                                            val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
                                             touchClick(targetClickX, GetCoin_Y)
 
                                             if (coinValueToRecord > 0f) {

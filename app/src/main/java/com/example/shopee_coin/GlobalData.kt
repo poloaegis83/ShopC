@@ -28,6 +28,8 @@ object GlobalValueHolder {
     var notInTimeBcckToHere by mutableStateOf(false)
     var advanceSetting by mutableStateOf(false)
     var isOldCompatibilityMode by mutableStateOf(false)
+    var isDebugMode by mutableStateOf(false)
+    var debugText by mutableStateOf("")
 }
 
 var isEnabledAcService = true

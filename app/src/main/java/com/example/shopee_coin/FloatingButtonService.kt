@@ -30,6 +30,7 @@ class FloatingButtonService : Service() {
     private lateinit var button: ImageView
     private lateinit var statusText: TextView
     private lateinit var recordText: TextView
+    private lateinit var debugText: TextView
     private val binder = LocalBinder()
 
     val initX = 60
@@ -51,6 +52,7 @@ class FloatingButtonService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         statusText = floatingView.findViewById(R.id.statusText)
         recordText = floatingView.findViewById(R.id.recordText)
+        debugText = floatingView.findViewById(R.id.debugText)
         button = floatingView.findViewById(R.id.floatingButton)
 
         val layoutParams = WindowManager.LayoutParams(
@@ -197,6 +199,44 @@ class FloatingButtonService : Service() {
     fun updateStatusText(text: String) {
         Handler(Looper.getMainLooper()).post {
             statusText.text = text
+            updateDebugVisibility()
+        }
+    }
+
+    private fun updateDebugVisibility() {
+        val layoutParams = floatingView.layoutParams as WindowManager.LayoutParams
+        val displayMetrics = resources.displayMetrics
+        
+        if (GlobalValueHolder.isDebugMode) {
+            debugText.visibility = View.VISIBLE
+            debugText.text = GlobalValueHolder.debugText
+            
+            // 增加寬度以容納 Debug 資訊，上限為螢幕 1/3
+            val targetWidth = (displayMetrics.widthPixels / 3.2f).toInt()
+            if (layoutParams.width != targetWidth) {
+                layoutParams.width = targetWidth
+                windowManager.updateViewLayout(floatingView, layoutParams)
+            }
+        } else {
+            debugText.visibility = View.GONE
+            // 恢復原本寬度 (與 ImageView 寬度一致，約 68dp)
+            val normalWidth = (68 * displayMetrics.density).toInt()
+            if (layoutParams.width != normalWidth) {
+                layoutParams.width = normalWidth
+                windowManager.updateViewLayout(floatingView, layoutParams)
+            }
+        }
+    }
+
+    fun updateDebugInfo(text: String) {
+        GlobalValueHolder.debugText = text
+        Handler(Looper.getMainLooper()).post {
+            if (GlobalValueHolder.isDebugMode) {
+                debugText.visibility = View.VISIBLE
+                debugText.text = text
+            } else {
+                debugText.visibility = View.GONE
+            }
         }
     }
 
