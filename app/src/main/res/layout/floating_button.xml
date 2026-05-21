@@ -33,4 +33,13 @@
         android:maxLines="2"
         android:ellipsize="end"
         android:textSize="7sp" />
+    <TextView
+        android:id="@+id/debugText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="@android:color/white"
+        android:gravity="start"
+        android:textSize="6sp"
+        android:visibility="gone" />
 </LinearLayout>

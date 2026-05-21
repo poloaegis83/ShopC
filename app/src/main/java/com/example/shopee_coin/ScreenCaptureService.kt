@@ -102,6 +102,10 @@ class ScreenCaptureService : Service() {
     // Debug 資訊變數
     private var debugCoinPosValue = "Non"
     private var debugGetPos = "Non"
+    private var debugPeriodInfo = "Unknown"
+    private var debugUpValue = 0f
+    private var debugDownValue = 0f
+    private var debugLineText = ""
 
     private var floatingService: FloatingButtonService? = null
     private var isBound = false
@@ -417,12 +421,22 @@ class ScreenCaptureService : Service() {
             DownValueNow = currentTStrategy.PeriodDownValue
             MinusValueNow = currentTStrategy.CoinValueMinus
             RefreshCountNow = currentTStrategy.RefreshCount
+            
+            // 更新 Debug 資訊
+            debugUpValue = UpValueNow
+            debugDownValue = DownValueNow
+            debugPeriodInfo = String.format(java.util.Locale.US, "%02d:%02d-%02d:%02d", 
+                currentTStrategy.Start_Hour, currentTStrategy.Start_Mins, 
+                currentTStrategy.End_Hour, currentTStrategy.End_Mins)
         } else {
             Log.d("CoinStrategy", "目前沒有適用的策略")
             UpValueNow = 0.3f
             DownValueNow = 0.2f
             MinusValueNow = 0.1f
             RefreshCountNow = 5
+            debugUpValue = UpValueNow
+            debugDownValue = DownValueNow
+            debugPeriodInfo = "No Strategy"
         }
         if (GlobalValueHolder.DownValue != 0f) {
             //
@@ -634,6 +648,7 @@ class ScreenCaptureService : Service() {
         // 重置 Debug 資訊
         debugCoinPosValue = "Non"
         debugGetPos = "Non"
+        debugLineText = ""
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
         val image = imageReader?.acquireLatestImage()
@@ -662,11 +677,17 @@ class ScreenCaptureService : Service() {
             
             // 更新 Debug 訊息
             if (GlobalValueHolder.isDebugMode) {
-                val debugMsg = "Goal(${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)})\n" +
+                var debugMsg = "Goal:${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)} " +
+                               "(Up:${String.format(java.util.Locale.US, "%.1f", debugUpValue)} " +
+                               "Down:${String.format(java.util.Locale.US, "%.1f", debugDownValue)})\n" +
+                               "Period($debugPeriodInfo)\n" +
                                "CoinValue:$debugCoinPosValue\n" +
                                "GetButton:$debugGetPos\n" +
                                "Interval:$CallBack_Interval ms\n" +
                                "State:$CoinStates"
+                if (debugLineText.isNotEmpty()) {
+                    debugMsg += "\nTxt:$debugLineText"
+                }
                 floatingService?.updateDebugInfo(debugMsg)
             }
         }
@@ -980,6 +1001,7 @@ class ScreenCaptureService : Service() {
                                             
                                             // 更新 Debug 資訊
                                             debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
+                                            debugLineText = line.text
 
                                             if (coinValueToRecord >= CoinValueSatisfy) {
                                                 Log.d("CoinValue", "符合門檻：$coinValueToRecord >= $CoinValueSatisfy")
