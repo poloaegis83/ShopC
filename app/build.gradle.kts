@@ -12,8 +12,8 @@ android {
         applicationId = "com.meteor.alderlake"
         minSdk = 23
         targetSdk = 35
-        versionCode = 3
-        versionName = "10104"
+        versionCode = 4
+        versionName = "10522"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
