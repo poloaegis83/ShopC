@@ -68,8 +68,13 @@ class ScreenCaptureService : Service() {
 
     var CoinStates = CState.COIN_START
 
-    // 狀態丟失計數器 (用於 WAITING_COIN 豁免)
+    // 狀態丟失計計數器 (用於 WAITING_COIN 豁免)
     private var stateLossCounter = 0
+
+    // 優化：回溯導航 (Backtracking)
+    private val roomHistoryMap = mutableMapOf<Int, Pair<Float, Long>>()
+    private var currentRoomIndex = 0
+    private val HISTORY_TTL = 5 * 60 * 1000L // 5分鐘內有效
 
     var checkLiveStreamingPage_retry_count = 0
     var notInLiveStreamingPage_reopen_request = false
@@ -236,7 +241,9 @@ class ScreenCaptureService : Service() {
 
                 setupMediaProjection()
                 setupVirtualDisplay()
-                SearchLogic(true)
+                serviceScope.launch {
+                    SearchLogic(true)
+                }
                 startCaptureLoopNew()
                 isRunning = true
             }
@@ -406,10 +413,8 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun SearchLogic(IsInit: Boolean) {
-
-        //Log.d("checkForegroundApp()", "：${MyAccessibilityService.checkForegroundApp()}")
-
+    private suspend fun SearchLogic(IsInit: Boolean) {
+        // ...
         val (T_hour, T_mins) = TimeLib.GetTime()
         var UpValueNow = 0f
         var DownValueNow = 0f
@@ -466,12 +471,33 @@ class ScreenCaptureService : Service() {
             Log.d("SearchLogic", "SearchCount = $SearchCount, CoinValueSatisfy = $CoinValueSatisfy")
             if (CoinStates  == CState.NOT_FIND_DOING_FRESH) {
                 if (SearchCount > RefreshCountNow) {
-                    SearchCount = 0
-                    if (CoinValueSatisfy - MinusValueNow >= DownValueNow) {
-                        CoinValueSatisfy -= MinusValueNow
-                    }
-                    serviceScope.launch {
-                        Log.d("SearchLogic", "FullFreshPage")
+                    val nextSatisfy = maxOf(DownValueNow, CoinValueSatisfy - MinusValueNow)
+                    
+                    // 嘗試回溯：在歷史紀錄中尋找符合 nextSatisfy 的房間
+                    val now = System.currentTimeMillis()
+                    val bestPastRoom = roomHistoryMap.filter { 
+                        it.value.second > now - HISTORY_TTL && it.value.first >= nextSatisfy 
+                    }.maxByOrNull { it.value.first }
+
+                    if (bestPastRoom != null && bestPastRoom.key < currentRoomIndex) {
+                        val targetIndex = bestPastRoom.key
+                        val stepsBack = currentRoomIndex - targetIndex
+                        Log.d("SearchLogic", "找到歷史優質房間: Index $targetIndex, Value ${bestPastRoom.value.first}, 回滑 $stepsBack 次")
+                        
+                        CoinValueSatisfy = nextSatisfy
+                        SearchCount = 0
+                        
+                        MoveActionMutex.withLock {
+                            repeat(stepsBack) {
+                                movePreviousPage()
+                                delay(5000L) // 等待動畫穩定
+                            }
+                        }
+                    } else {
+                        // 無歷史可用，執行原始的全域刷新邏輯
+                        SearchCount = 0
+                        CoinValueSatisfy = nextSatisfy
+                        Log.d("SearchLogic", "無合適歷史，執行 FullFreshPage")
                         FullFreshPage()
                     }
                 }
@@ -656,7 +682,9 @@ class ScreenCaptureService : Service() {
         debugLineVal = ""
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
-        val image = imageReader?.acquireLatestImage()
+        val image = MoveActionMutex.withLock {
+            imageReader?.acquireLatestImage()
+        }
         if (image == null) {
             gIsCapturing = false
             return
@@ -1006,6 +1034,9 @@ class ScreenCaptureService : Service() {
                                             Coin_Position_Height = boxc.height().toFloat()
 
                                             coinValueToRecord = matches1.value.toFloat()
+                                            
+                                            // 💡 紀錄到歷史清單
+                                            roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
                                             
                                             // 更新 Debug 資訊
                                             debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
@@ -1441,19 +1472,21 @@ class ScreenCaptureService : Service() {
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun FullFreshPage() {
+    private suspend fun FullFreshPage() {
+
+        // 💡 Full Refresh 後順序會亂掉，必須清空歷史
+        roomHistoryMap.clear()
+        currentRoomIndex = 0
 
         if (Full_refresh_Position_x != 0f && Full_refresh_Position_y != 0f) {
-            serviceScope.launch {
-                delay(200L)
-                touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
-                delay(500L)
-                touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
-                delay(1000L)
-                moveNextPage()
-                delay(300L)
-                moveNextPage()
-            }
+            delay(200L)
+            touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
+            delay(500L)
+            touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
+            delay(1000L)
+            moveNextPage()
+            delay(300L)
+            moveNextPage()
         }
 
     }
@@ -1487,6 +1520,9 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun movePreviousPage () {
+        currentRoomIndex--
+        if (currentRoomIndex < 0) currentRoomIndex = 0
+        
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
         val MoveDistance  = metrics.heightPixels / 2.5f
@@ -1496,6 +1532,8 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun moveNextPage () {
+        currentRoomIndex++
+
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
         val MoveDistance  = metrics.heightPixels / 2.5f
