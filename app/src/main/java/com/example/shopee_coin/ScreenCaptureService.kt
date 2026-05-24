@@ -715,7 +715,7 @@ class ScreenCaptureService : Service() {
                     debugMsg += "\nTxt:${GlobalValueHolder.debugLineText}"
                 }
                 if (GlobalValueHolder.debugLineVal.isNotEmpty()) {
-                    debugMsg += "\nVal:${GlobalValueHolder.debugLineVal}"
+                    debugMsg += "\nTime:${GlobalValueHolder.debugLineVal}"
                 }
                 floatingService?.updateDebugInfo(debugMsg)
             }
@@ -933,12 +933,41 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun HandleCoinCase(bitmap: Bitmap) {
-        // 處理硬幣案例：擴大裁切範圍至右上角 1/4，以確保能完整捕捉硬幣影像
-        //val cutBitmap = BitmapCropLib.cropToTopRightEighth (bitmap)
         val cutBitmap = BitmapCropLib.cropToTopRightQuarter(bitmap)
+        
+        // 1. 準備金色增強圖 (專攻數字)
+        val goldEnhanced = BitmapCropLib.toGoldEnhanced(cutBitmap)
+        val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, UpscaleRate.toInt())
+        
+        // 2. 準備白色增強圖 (專攻時間/標題/按鈕)
+        val whiteEnhanced = BitmapCropLib.toWhiteEnhanced(cutBitmap)
 
-        recognizeTextAndHandleGesture(cutBitmap, this) { resultText ->
-            processCoinCase(resultText, bitmap.width)
+        // 💡 儲存圖片到相簿 (DCIM/ShopC_Debug) - 僅在 ImageDebug 開啟時
+        if (GlobalValueHolder.isImageDebugMode) {
+            BitmapCropLib.saveBitmapToGallery(this, goldEnhancedUpscaled, "GoldFilter")
+            BitmapCropLib.saveBitmapToGallery(this, whiteEnhanced, "WhiteFilter")
+        }
+
+        // 進行三路辨識 (以 gold 與 white 為主)
+        recognizeTextAndHandleGesture(cutBitmap, this) { normalResult ->
+            TextRecognizerUtil.recognizeTextFromImage(goldEnhancedUpscaled, this, { goldResult ->
+                TextRecognizerUtil.recognizeTextFromImage(whiteEnhanced, this, { whiteResult ->
+                    processCoinCase(goldResult, whiteResult, bitmap.width)
+                    
+                    // 清理資源
+                    goldEnhanced.recycle()
+                    goldEnhancedUpscaled.recycle()
+                    whiteEnhanced.recycle()
+                }, {
+                    goldEnhanced.recycle()
+                    goldEnhancedUpscaled.recycle()
+                    whiteEnhanced.recycle()
+                })
+            }, {
+                goldEnhanced.recycle()
+                goldEnhancedUpscaled.recycle()
+                whiteEnhanced.recycle()
+            })
         }
     }
 
@@ -965,7 +994,7 @@ class ScreenCaptureService : Service() {
 
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun processCoinCase(resultText: Text, screenshotWidth: Int) {
+    private fun processCoinCase(goldResult: Text, whiteResult: Text, screenshotWidth: Int) {
 
         val regex1 = Regex("([0-1]\\.\\d{1,2}|[1])")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
@@ -992,8 +1021,8 @@ class ScreenCaptureService : Service() {
                 try {
                     var headerBox: android.graphics.Rect? = null
 
-                    // 第一階段：確認 "直播間蝦幣" or "蝦皮直播任務獎歷" 是否存在
-                    for (block in resultText.textBlocks) {
+                    // 第一階段：確認 "直播間蝦幣" or "蝦皮直播任務獎歷" 是否存在 - 使用白色濾鏡
+                    for (block in whiteResult.textBlocks) {
                         for (line in block.lines) {
                             Log.d("CoinValue", "第一階段文字：${line.text}")
                             if (regex5.find(line.text) != null || regex6.find(line.text) != null  ) {
@@ -1005,14 +1034,22 @@ class ScreenCaptureService : Service() {
                         }
                     }
 
-                    // 第二階段：若標題存在，尋找 蝦幣數字 (CoinValue) 並記錄位置
-                    for (block in resultText.textBlocks) {
+                    // 第二階段：若標題存在，尋找 蝦幣數字 (CoinValue) 並記錄位置 - 使用金色濾鏡
+                    for (block in goldResult.textBlocks) {
                         if (findLiveCoinHeader && headerBox != null) {
                             for (line in block.lines) {
                                 val matches1 = regex1.find(line.text)
                                 if (matches1 != null && last_notZero(matches1.value)) {
-                                    val boxc = line.boundingBox
-                                    if (boxc != null) {
+                                    val boxcRaw = line.boundingBox
+                                    if (boxcRaw != null) {
+                                        // 💡 因為 goldResult 是經過 UpscaleRate 倍縮放，座標需還原
+                                        val boxc = android.graphics.Rect(
+                                            (boxcRaw.left / UpscaleRate).toInt(),
+                                            (boxcRaw.top / UpscaleRate).toInt(),
+                                            (boxcRaw.right / UpscaleRate).toInt(),
+                                            (boxcRaw.bottom / UpscaleRate).toInt()
+                                        )
+
                                         val currentHeader = headerBox
                                         val isBelowHeader = boxc.centerY() > currentHeader.centerY()
                                         val isWithinHorizontalBounds = boxc.centerX() >= currentHeader.left && boxc.centerX() <= currentHeader.right
@@ -1036,11 +1073,14 @@ class ScreenCaptureService : Service() {
                                             GlobalValueHolder.debugLineText = line.text
                                             GlobalValueHolder.debugLineVal = matches1.value
 
+                                            // 💡 無論是否符合門檻，只要找到了就暫時標記為發現，供後續階段判斷時間
+                                            if (nextState == CState.SEARCHING_COIN || nextState == CState.PAGE_COIN_NOT_FIND) {
+                                                nextState = CState.COIN_VAULE_FIND
+                                            }
+
                                             if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
                                                 Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
-                                                nextState = CState.COIN_VAULE_FIND
                                                 NotFindConter = 0
-                                                // headerBox = boxc // 更新 headerBox 供第三階段判斷相對位置（選用）
                                             }
                                         }
                                     }
@@ -1051,26 +1091,34 @@ class ScreenCaptureService : Service() {
 
                     var isLoopBroken = false
 
-                    // 第三與第四階段：處理時間倒數與領取/重試按鈕
-                    OuterReg@ for (block in resultText.textBlocks) {
-                        for (line in block.lines) {
-                            // 1. 處理時間倒數 (第三階段)
-                            if (nextState == CState.COIN_VAULE_FIND && Coin_Position_x != 0f) {
+                    // 第三與第四階段：處理時間倒數與領取/重試按鈕 - 使用白色濾鏡
+                    // 3. 處理時間倒數 (第三階段)
+                    if (nextState == CState.COIN_VAULE_FIND && Coin_Position_x != 0f) {
+                        OuterTime@ for (block in whiteResult.textBlocks) {
+                            for (line in block.lines) {
                                 val matches2 = regex2.find(line.text)
                                 if (matches2 != null) {
-                                    val boxt = line.boundingBox
-                                    if (boxt != null) {
-                                        val timey = realY(boxt.top.toFloat(), 0f)
+                                    val boxtRaw = line.boundingBox
+                                    if (boxtRaw != null) {
+                                        // 💡 因為 whiteResult 是在 cutBitmap (1:1) 解析度下辨識，不需要 UpscaleRate
+                                        val timey = realY(boxtRaw.top.toFloat(), 0f)
                                         // 判斷時間是否在數字下方合理的範圍內
                                         if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f) {
                                             Log.d("RegexMatch", "第三階段：找到倒數時間 ${matches2.value} -> WAITING_COIN")
+                                            GlobalValueHolder.debugLineVal = matches2.value // 💡 紀錄找到的時間字串
                                             nextState = CState.WAITING_COIN
                                             gFindCoinButNoTime = 0
+                                            break@OuterTime
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
 
+                    // 4. 處理「領取」按鈕與「重試」(第四階段)
+                    OuterReg@ for (block in whiteResult.textBlocks) {
+                        for (line in block.lines) {
                             // 2. 處理「領取」按鈕 (第四階段)
                             val matches3 = regex3.find(line.text)
                             if (matches3 != null) {

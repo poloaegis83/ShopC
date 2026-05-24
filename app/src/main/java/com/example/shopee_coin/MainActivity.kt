@@ -488,11 +488,31 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 checked = GlobalValueHolder.isDebugMode,
                                 onCheckedChange = { checked ->
                                     GlobalValueHolder.isDebugMode = checked
+                                    if (!checked) GlobalValueHolder.isImageDebugMode = false
                                 },
                             )
                         }
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(text = "Debug訊息", fontSize = 12.sp)
+
+                        if (GlobalValueHolder.isDebugMode) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(15.dp)
+                                    .background(Color.LightGray, shape = RoundedCornerShape(2.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Checkbox(
+                                    checked = GlobalValueHolder.isImageDebugMode,
+                                    onCheckedChange = { checked ->
+                                        GlobalValueHolder.isImageDebugMode = checked
+                                    },
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(text = "ImageDebug", fontSize = 12.sp)
+                        }
                     }
                 }
                 Row(
