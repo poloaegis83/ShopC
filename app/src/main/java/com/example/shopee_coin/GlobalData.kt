@@ -29,7 +29,18 @@ object GlobalValueHolder {
     var advanceSetting by mutableStateOf(false)
     var isOldCompatibilityMode by mutableStateOf(false)
     var isDebugMode by mutableStateOf(false)
+    var isImageDebugMode by mutableStateOf(false)
     var debugText by mutableStateOf("")
+
+    // 💡 響應式 Debug 資訊
+    var coinValueSatisfy by mutableStateOf(0f)
+    var debugCoinPosValue by mutableStateOf("Non")
+    var debugGetPos by mutableStateOf("Non")
+    var debugLineText by mutableStateOf("")
+    var debugLineVal by mutableStateOf("")
+    var debugUpValue by mutableStateOf(0f)
+    var debugDownValue by mutableStateOf(0f)
+    var debugPeriodInfo by mutableStateOf("")
 }
 
 var isEnabledAcService = true

@@ -58,7 +58,7 @@ class ScreenCaptureService : Service() {
     var CallBack_Interval = 5000L
     var NotFindConter = 0
     var SearchCount = 0
-    var CoinValueSatisfy = GlobalValueHolder.DownValue
+    // var CoinValueSatisfy = GlobalValueHolder.DownValue // 已移至 GlobalValueHolder
     var Full_refresh_Position_x  = 0f
     var Full_refresh_Position_y  = 0f
 
@@ -104,14 +104,7 @@ class ScreenCaptureService : Service() {
 
     var waiting_live_checker = false
 
-    // Debug 資訊變數
-    private var debugCoinPosValue = "Non"
-    private var debugGetPos = "Non"
-    private var debugPeriodInfo = "Unknown"
-    private var debugUpValue = 0f
-    private var debugDownValue = 0f
-    private var debugLineText = ""
-    private var debugLineVal = ""
+    // Debug 資訊變數已移至 GlobalValueHolder
 
     private var floatingService: FloatingButtonService? = null
     private var isBound = false
@@ -430,9 +423,9 @@ class ScreenCaptureService : Service() {
             RefreshCountNow = currentTStrategy.RefreshCount
             
             // 更新 Debug 資訊
-            debugUpValue = UpValueNow
-            debugDownValue = DownValueNow
-            debugPeriodInfo = String.format(java.util.Locale.US, "%02d:%02d-%02d:%02d", 
+            GlobalValueHolder.debugUpValue = UpValueNow
+            GlobalValueHolder.debugDownValue = DownValueNow
+            GlobalValueHolder.debugPeriodInfo = String.format(java.util.Locale.US, "%02d:%02d-%02d:%02d", 
                 currentTStrategy.Start_Hour, currentTStrategy.Start_Mins, 
                 currentTStrategy.End_Hour, currentTStrategy.End_Mins)
         } else {
@@ -441,9 +434,9 @@ class ScreenCaptureService : Service() {
             DownValueNow = 0.2f
             MinusValueNow = 0.1f
             RefreshCountNow = 5
-            debugUpValue = UpValueNow
-            debugDownValue = DownValueNow
-            debugPeriodInfo = "No Strategy"
+            GlobalValueHolder.debugUpValue = UpValueNow
+            GlobalValueHolder.debugDownValue = DownValueNow
+            GlobalValueHolder.debugPeriodInfo = "No Strategy"
         }
         if (GlobalValueHolder.DownValue != 0f) {
             //
@@ -452,7 +445,7 @@ class ScreenCaptureService : Service() {
             DownValueNow = GlobalValueHolder.DownValue
         }
         if (IsInit) {
-            CoinValueSatisfy = UpValueNow
+            GlobalValueHolder.coinValueSatisfy = UpValueNow
         } else {
             if (CoinStates == CState.NOT_FIND_DOING_FRESH) {
                 Log.d("SearchLogic", "CState.PAGE_COIN_NOT_FIND SearchCount += 1")
@@ -463,15 +456,11 @@ class ScreenCaptureService : Service() {
             if (CoinStates == CState.WAITING_COIN) {
                 Log.d("SearchLogic", "CState.WAITING_COIN")
             }
-            if (CoinStates == CState.GET_COIN_READY) {
-                Log.d("SearchLogic", "CState.GET_COIN_READY CoinValueSatisfy = UpValueNow")
-                CoinValueSatisfy = UpValueNow
-            }
 
-            Log.d("SearchLogic", "SearchCount = $SearchCount, CoinValueSatisfy = $CoinValueSatisfy")
+            Log.d("SearchLogic", "SearchCount = $SearchCount, CoinValueSatisfy = ${GlobalValueHolder.coinValueSatisfy}")
             if (CoinStates  == CState.NOT_FIND_DOING_FRESH) {
                 if (SearchCount > RefreshCountNow) {
-                    val nextSatisfy = maxOf(DownValueNow, CoinValueSatisfy - MinusValueNow)
+                    val nextSatisfy = maxOf(DownValueNow, GlobalValueHolder.coinValueSatisfy - MinusValueNow)
                     
                     // 嘗試回溯：在歷史紀錄中尋找符合 nextSatisfy 的房間
                     val now = System.currentTimeMillis()
@@ -484,7 +473,7 @@ class ScreenCaptureService : Service() {
                         val stepsBack = currentRoomIndex - targetIndex
                         Log.d("SearchLogic", "找到歷史優質房間: Index $targetIndex, Value ${bestPastRoom.value.first}, 回滑 $stepsBack 次")
                         
-                        CoinValueSatisfy = nextSatisfy
+                        GlobalValueHolder.coinValueSatisfy = nextSatisfy
                         SearchCount = 0
                         
                         MoveActionMutex.withLock {
@@ -496,7 +485,7 @@ class ScreenCaptureService : Service() {
                     } else {
                         // 無歷史可用，執行原始的全域刷新邏輯
                         SearchCount = 0
-                        CoinValueSatisfy = nextSatisfy
+                        GlobalValueHolder.coinValueSatisfy = nextSatisfy
                         Log.d("SearchLogic", "無合適歷史，執行 FullFreshPage")
                         FullFreshPage()
                     }
@@ -676,10 +665,14 @@ class ScreenCaptureService : Service() {
         gIsCapturing = true
         
         // 重置 Debug 資訊
-        debugCoinPosValue = "Non"
-        debugGetPos = "Non"
-        debugLineText = ""
-        debugLineVal = ""
+        // 💡 只有在狀態切換回 SEARCHING_COIN 時才重置資訊，
+        // 這樣可以讓抓到的 CoinVal 在畫面上留久一點
+        if (CoinStates == CState.SEARCHING_COIN) {
+            GlobalValueHolder.debugCoinPosValue = "Non"
+            GlobalValueHolder.debugGetPos = "Non"
+            GlobalValueHolder.debugLineText = ""
+            GlobalValueHolder.debugLineVal = ""
+        }
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
         val image = MoveActionMutex.withLock {
@@ -710,19 +703,19 @@ class ScreenCaptureService : Service() {
             
             // 更新 Debug 訊息
             if (GlobalValueHolder.isDebugMode) {
-                var debugMsg = "Goal:${String.format(java.util.Locale.US, "%.1f", CoinValueSatisfy)} " +
-                               "(Up:${String.format(java.util.Locale.US, "%.1f", debugUpValue)} " +
-                               "Dn:${String.format(java.util.Locale.US, "%.1f", debugDownValue)})\n" +
-                               "Peri($debugPeriodInfo)\n" +
-                               "CoinVal:$debugCoinPosValue\n" +
-                               "GetBtn:$debugGetPos\n" +
+                var debugMsg = "Goal:${String.format(java.util.Locale.US, "%.1f", GlobalValueHolder.coinValueSatisfy)} " +
+                               "(Up:${String.format(java.util.Locale.US, "%.1f", GlobalValueHolder.debugUpValue)} " +
+                               "Dn:${String.format(java.util.Locale.US, "%.1f", GlobalValueHolder.debugDownValue)})\n" +
+                               "Peri(${GlobalValueHolder.debugPeriodInfo})\n" +
+                               "CoinVal:${GlobalValueHolder.debugCoinPosValue}\n" +
+                               "GetBtn:${GlobalValueHolder.debugGetPos}\n" +
                                "Intv:$CallBack_Interval ms\n" +
                                "Sta:$CoinStates"
-                if (debugLineText.isNotEmpty()) {
-                    debugMsg += "\nTxt:$debugLineText"
+                if (GlobalValueHolder.debugLineText.isNotEmpty()) {
+                    debugMsg += "\nTxt:${GlobalValueHolder.debugLineText}"
                 }
-                if (debugLineVal.isNotEmpty()) {
-                    debugMsg += "\nVal:$debugLineVal"
+                if (GlobalValueHolder.debugLineVal.isNotEmpty()) {
+                    debugMsg += "\nVal:${GlobalValueHolder.debugLineVal}"
                 }
                 floatingService?.updateDebugInfo(debugMsg)
             }
@@ -1039,12 +1032,12 @@ class ScreenCaptureService : Service() {
                                             roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
                                             
                                             // 更新 Debug 資訊
-                                            debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
-                                            debugLineText = line.text
-                                            debugLineVal = matches1.value
+                                            GlobalValueHolder.debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
+                                            GlobalValueHolder.debugLineText = line.text
+                                            GlobalValueHolder.debugLineVal = matches1.value
 
-                                            if (coinValueToRecord >= CoinValueSatisfy) {
-                                                Log.d("CoinValue", "符合門檻：$coinValueToRecord >= $CoinValueSatisfy")
+                                            if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
+                                                Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
                                                 nextState = CState.COIN_VAULE_FIND
                                                 NotFindConter = 0
                                                 // headerBox = boxc // 更新 headerBox 供第三階段判斷相對位置（選用）
@@ -1096,7 +1089,7 @@ class ScreenCaptureService : Service() {
                                             
                                             val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
                                             // 更新 Debug 資訊
-                                            debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
+                                            GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
 
                                             nextState = CState.GET_COIN_READY
                                             gFindCoinButNoTime = 0
@@ -1108,6 +1101,13 @@ class ScreenCaptureService : Service() {
                                                 if (RecordCionLimiter.canCall()) {
                                                     coinClaimStorage.addClaim(CoinClaim(amount = coinValueToRecord.toDouble()))
                                                     floatingService?.updateRecordTextToday()
+                                                    
+                                                    // 💡 領取成功的當下，重置門檻為該時段的 UpValue
+                                                    val (T_hour, T_mins) = TimeLib.GetTime()
+                                                    findCurrentStrategy(T_hour, T_mins, DefaultStrategies)?.let { strategy ->
+                                                        GlobalValueHolder.coinValueSatisfy = strategy.PeriodUpValue
+                                                        Log.d("processCoinCase", "領取成功：重置門檻為 ${strategy.PeriodUpValue}")
+                                                    }
                                                 }
                                             }
                                             serviceScope.launch { delay(3000L) }
