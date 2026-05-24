@@ -1525,7 +1525,7 @@ class ScreenCaptureService : Service() {
         
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 2.5f
+        val MoveDistance  = metrics.heightPixels / 2.85f
         Log.d("MovePreviousPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
         touchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 900)
     }
