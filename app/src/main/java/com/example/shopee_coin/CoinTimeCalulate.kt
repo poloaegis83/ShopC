@@ -2,8 +2,8 @@ package com.example.shopee_coin
 
 import android.content.Context
 import androidx.core.content.edit
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.reflect.TypeToken
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class CoinClaimStorage(context: Context) {
 
