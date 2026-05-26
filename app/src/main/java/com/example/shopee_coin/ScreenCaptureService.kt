@@ -202,6 +202,50 @@ class ScreenCaptureService : Service() {
         coinClaimStorage = CoinClaimStorage(this)  // this 是 context
         val intent = Intent(this, FloatingButtonService::class.java)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        
+        // 💡 啟動測試滑動 Loop (不依賴螢幕錄製權限)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            startSwipeTestLoop()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun startSwipeTestLoop() {
+        serviceScope.launch {
+            // 💡 增加一段緩衝延遲，確保 Service 與無障礙服務完全對接
+            delay(1000L)
+            var wasTesting = false
+            while (isActive) {
+                if (GlobalValueHolder.isSwipeTesting) {
+                    if (!wasTesting) {
+                        Log.d("SwipeTest", "測試即將開始，等待 3 秒讓使用者切換到蝦皮...")
+                        delay(3000L)
+                        wasTesting = true
+                    }
+                    try {
+                        Log.d("SwipeTest", "執行測試滑動: 下一房 -> 上一房")
+                        MoveActionMutex.withLock {
+                            moveNextPage()
+                        }
+                        delay(5000L)
+                        // 二次檢查防止延遲期間使用者已關閉測試
+                        if (GlobalValueHolder.isSwipeTesting) {
+                            MoveActionMutex.withLock {
+                                movePreviousPage()
+                            }
+                        }
+                        delay(5000L)
+                    } catch (e: Exception) {
+                        Log.e("SwipeTest", "滑動測試發生錯誤: ${e.message}")
+                        GlobalValueHolder.isSwipeTesting = false
+                        wasTesting = false
+                    }
+                } else {
+                    wasTesting = false
+                    delay(1000L)
+                }
+            }
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -1577,9 +1621,9 @@ class ScreenCaptureService : Service() {
         
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 2.85f
+        val MoveDistance  = metrics.heightPixels / GlobalValueHolder.prevMoveFactor
         Log.d("MovePreviousPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, 900)
+        touchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, GlobalValueHolder.prevMoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -1588,9 +1632,9 @@ class ScreenCaptureService : Service() {
 
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / 2.5f
+        val MoveDistance  = metrics.heightPixels / GlobalValueHolder.nextMoveFactor
         Log.d("MoveNextPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, 900)
+        touchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, GlobalValueHolder.nextMoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)

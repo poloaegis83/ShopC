@@ -53,6 +53,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,6 +75,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -114,9 +116,29 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
     }
 
+    private fun loadSwipeSettings() {
+        val prefs = getSharedPreferences("SwipeSettings", Context.MODE_PRIVATE)
+        GlobalValueHolder.nextMoveFactor = prefs.getFloat("nextMoveFactor", GlobalValueHolder.DEFAULT_NEXT_FACTOR)
+        GlobalValueHolder.nextMoveLong = prefs.getLong("nextMoveLong", GlobalValueHolder.DEFAULT_NEXT_LONG)
+        GlobalValueHolder.prevMoveFactor = prefs.getFloat("prevMoveFactor", GlobalValueHolder.DEFAULT_PREV_FACTOR)
+        GlobalValueHolder.prevMoveLong = prefs.getLong("prevMoveLong", GlobalValueHolder.DEFAULT_PREV_LONG)
+    }
+
+    private fun saveSwipeSettings() {
+        val prefs = getSharedPreferences("SwipeSettings", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putFloat("nextMoveFactor", GlobalValueHolder.nextMoveFactor)
+            putLong("nextMoveLong", GlobalValueHolder.nextMoveLong)
+            putFloat("prevMoveFactor", GlobalValueHolder.prevMoveFactor)
+            putLong("prevMoveLong", GlobalValueHolder.prevMoveLong)
+            apply()
+        }
+    }
+
     //@RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        loadSwipeSettings()
 
         //
         // 懸浮視窗的權限 Start
@@ -240,6 +262,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     @SuppressLint("DefaultLocale")
     @Composable
     fun SetPageItems() {
+
+        var showSwipeTuningDialog by remember { mutableStateOf(false) }
 
         //var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
         //var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
@@ -581,9 +605,32 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         )
                     }
                     Spacer(modifier = Modifier.width(3.dp))
-                    Text(text = "不再排程時段內，返回此APP等待",
+                    Text(text = "排程時段外，返回此APP等",
                         fontSize = 11.sp // 自訂字體大小
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { 
+                            // 💡 確保無障礙服務已啟動再進行測試，否則滑動會沒反應
+                            if (isEnabledAcService && MyAccessibilityService.isRunning) {
+                                if (!isServiceRunning(ScreenCaptureService::class.java)) {
+                                    val intent = Intent(this@MainActivity, ScreenCaptureService::class.java)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        startForegroundService(intent)
+                                    } else {
+                                        startService(intent)
+                                    }
+                                }
+                                showSwipeTuningDialog = true 
+                            } else {
+                                showAccessibilityDialog = true
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("調整滑動", fontSize = 11.sp)
+                    }
                 }
             }
 
@@ -629,6 +676,10 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             }
 
             ImageForMe()
+        }
+
+        if (showSwipeTuningDialog) {
+            SwipeTuningDialog(onDismiss = { showSwipeTuningDialog = false })
         }
     }
 
@@ -1244,6 +1295,108 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
         GlobalValueHolder.DownValue = DownValue
         Log.d("GlobalValueHolder", "DownValue ${GlobalValueHolder.DownValue}")
+    }
+
+    @Composable
+    fun SwipeTuningDialog(onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = {
+                // 💡 點擊外部或返回時不主動停止測試，允許使用者切換到蝦皮觀察
+                onDismiss()
+            },
+            title = { Text("滑動參數調整") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SwipeConfigItemUI("下一個房間 (上滑)", 
+                        GlobalValueHolder.nextMoveFactor, 
+                        GlobalValueHolder.nextMoveLong,
+                        onFactorChange = { GlobalValueHolder.nextMoveFactor = it },
+                        onLongChange = { GlobalValueHolder.nextMoveLong = it }
+                    )
+
+                    SwipeConfigItemUI("上一個房間 (下滑)", 
+                        GlobalValueHolder.prevMoveFactor, 
+                        GlobalValueHolder.prevMoveLong,
+                        onFactorChange = { GlobalValueHolder.prevMoveFactor = it },
+                        onLongChange = { GlobalValueHolder.prevMoveLong = it }
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { 
+                                GlobalValueHolder.isSwipeTesting = !GlobalValueHolder.isSwipeTesting 
+                                if (GlobalValueHolder.isSwipeTesting) {
+                                    Toast.makeText(this@MainActivity, "測試將在 3 秒後開始，請立即切換到蝦皮直播", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (GlobalValueHolder.isSwipeTesting) Color.Red else Color(0xFF4CAF50)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(if (GlobalValueHolder.isSwipeTesting) "停止測試" else "測試滑動", color = Color.White)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    saveSwipeSettings()
+                    // 💡 點擊「儲存」時不主動停止測試，方便使用者立刻切換 App
+                    onDismiss()
+                }) {
+                    Text("儲存並關閉")
+                }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    GlobalValueHolder.nextMoveFactor = GlobalValueHolder.DEFAULT_NEXT_FACTOR
+                    GlobalValueHolder.nextMoveLong = GlobalValueHolder.DEFAULT_NEXT_LONG
+                    GlobalValueHolder.prevMoveFactor = GlobalValueHolder.DEFAULT_PREV_FACTOR
+                    GlobalValueHolder.prevMoveLong = GlobalValueHolder.DEFAULT_PREV_LONG
+                }) {
+                    Text("還原預設")
+                }
+            }
+        )
+    }
+
+    @Composable
+    fun SwipeConfigItemUI(title: String, factor: Float, duration: Long, onFactorChange: (Float) -> Unit, onLongChange: (Long) -> Unit) {
+        var fText by remember(factor) { mutableStateOf(factor.toString()) }
+        var lText by remember(duration) { mutableStateOf(duration.toString()) }
+
+        Column {
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = fText,
+                    onValueChange = { 
+                        fText = it
+                        it.toFloatOrNull()?.let { onFactorChange(it) }
+                    },
+                    label = { Text("距離係數", fontSize = 10.sp) },
+                    modifier = Modifier.width(90.dp),
+                    textStyle = TextStyle(fontSize = 12.sp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                OutlinedTextField(
+                    value = lText,
+                    onValueChange = { 
+                        lText = it
+                        it.toLongOrNull()?.let { onLongChange(it) }
+                    },
+                    label = { Text("時間(ms)", fontSize = 10.sp) },
+                    modifier = Modifier.width(90.dp),
+                    textStyle = TextStyle(fontSize = 12.sp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+        }
     }
 
     override fun onDestroy() {

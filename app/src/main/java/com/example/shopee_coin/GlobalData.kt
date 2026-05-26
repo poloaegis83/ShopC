@@ -41,6 +41,20 @@ object GlobalValueHolder {
     var debugUpValue by mutableStateOf(0f)
     var debugDownValue by mutableStateOf(0f)
     var debugPeriodInfo by mutableStateOf("")
+
+    // 💡 滑動參數動態調整 (factor = height / MoveDistance)
+    // Default values (調整為較安全的係數，避免觸發系統手勢)
+    const val DEFAULT_NEXT_FACTOR = 3.5f
+    const val DEFAULT_NEXT_LONG = 800L
+    const val DEFAULT_PREV_FACTOR = 3.5f
+    const val DEFAULT_PREV_LONG = 800L
+
+    var nextMoveFactor by mutableStateOf(DEFAULT_NEXT_FACTOR)
+    var nextMoveLong by mutableStateOf(DEFAULT_NEXT_LONG)
+    var prevMoveFactor by mutableStateOf(DEFAULT_PREV_FACTOR)
+    var prevMoveLong by mutableStateOf(DEFAULT_PREV_LONG)
+
+    var isSwipeTesting by mutableStateOf(false)
 }
 
 var isEnabledAcService = true
