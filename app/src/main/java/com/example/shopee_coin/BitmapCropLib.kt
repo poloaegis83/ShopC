@@ -104,6 +104,7 @@ object BitmapCropLib {
 
     /**
      * 使用 MediaStore 儲存圖片到公用 DCIM/ShopC_Debug 目錄，使其顯示在相簿中
+     * 強化版本：加入 Flush 與 MediaScanner 通知以提高不同手機的相容性
      */
     fun saveBitmapToGallery(context: android.content.Context, bitmap: Bitmap, prefix: String) {
         if (bitmap.isRecycled) return
@@ -127,16 +128,24 @@ object BitmapCropLib {
             uri?.let {
                 resolver.openOutputStream(it)?.use { outputStream ->
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                    outputStream.flush() // 💡 強制沖刷，確保寫入
                 }
+                
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentValues.clear()
                     contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
                     resolver.update(it, contentValues, null, null)
                 }
+
+                // 💡 手動通知系統掃描新檔案，確保相簿能立刻看到 (相容性強化)
+                android.media.MediaScannerConnection.scanFile(context, arrayOf(it.toString()), null, null)
+                
                 Log.d("BitmapCropLib", "圖片已存入相簿: ShopC_Debug/$fileName")
             }
         } catch (e: Exception) {
             Log.e("BitmapCropLib", "儲存相簿失敗: ${e.message}")
+            // 寫入失敗則清理殘留條目
+            uri?.let { resolver.delete(it, null, null) }
         }
     }
 

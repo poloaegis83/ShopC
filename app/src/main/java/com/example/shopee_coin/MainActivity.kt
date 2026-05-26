@@ -97,6 +97,7 @@ import kotlin.math.min
 class MainActivity<ClaimRecord> : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
+    private lateinit var storagePermissionLauncher: ActivityResultLauncher<Array<String>> // 儲存空間權限
     private lateinit var coinStorage: CoinClaimStorage
     private var floatingService: FloatingButtonService? = null
     private val serviceConnection = object : ServiceConnection {
@@ -139,6 +140,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         //
         // 懸浮視窗的權限 End
         //
+
+        //  儲存空間權限初始化
+        storagePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val granted = permissions.entries.all { it.value }
+            if (!granted) {
+                Log.w("MainActivity", "部分儲存權限被拒絕，ImageDebug 可能無法工作")
+            }
+        }
+        checkAndRequestStoragePermissions()
 
         //if (!isAccessibilityServiceEnabled(MyAccessibilityService::class.java)) {
         //    Toast.makeText(this, "⚠️ 請開啟無障礙服務以啟用自動操作", Toast.LENGTH_LONG).show()
@@ -1230,6 +1240,27 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         super.onStart()
         Intent(this, FloatingButtonService::class.java).also { intent ->
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    private fun checkAndRequestStoragePermissions() {
+        val permissions = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(android.Manifest.permission.READ_MEDIA_IMAGES)
+        } else {
+            permissions.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                permissions.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
+
+        val neededPermissions = permissions.filter {
+            androidx.core.content.ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+
+        if (neededPermissions.isNotEmpty()) {
+            storagePermissionLauncher.launch(neededPermissions.toTypedArray())
         }
     }
 
