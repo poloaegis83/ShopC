@@ -201,9 +201,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 val isRunning = MyAccessibilityService.isRunning
                                 
                                 val dialogText = if (!isEnabled) {
-                                    "本程式需要「無障礙服務」權限才能自動執行點擊與滑動。請在設定中找到「蝦霸」並開啟服務。"
+                                    "需要「無障礙服務」權限才能執行點擊與滑動。請在設定中找到「蝦霸」並開啟服務。"
                                 } else {
-                                    "無障礙服務目前處於「異常狀態」（系統顯示已開啟但未正常運作）。這通常是 Android 系統的 Bug，請到設定中將「蝦霸」服務「關掉再重新打開」即可修復。"
+                                    "無障礙服務目前處於「異常狀態」（已開啟但未正常運作）。這通常是 Android 系統的問題，請到設定中將「蝦霸」服務「關掉再重新打開」即可修復。"
                                 }
 
                                 AlertDialog(
