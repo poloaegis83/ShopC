@@ -1127,48 +1127,52 @@ class ScreenCaptureService : Service() {
                                     val GetCoin_Right_X = boxg.right.toFloat() + (screenshotWidth / 2f)
                                     val GetCoin_Y = realY(boxg.centerY().toFloat(), 0f)
 
-                                    if (Coin_Position_x != 0f || nextState == CState.COIN_VAULE_FIND) {
+                                    // 如果有偵測到數字，進行精確位置校驗；如果沒偵測到數字，也執行領取（提高相容性）
+                                    val isPositionValid = if (Coin_Position_x != 0f) {
                                         val isRightSide = GetCoin_Right_X > Coin_Position_x
                                         val tolerance = Coin_Position_Height * 0.3f
                                         val isWithinYRange = GetCoin_Y >= (Coin_Position_Top - tolerance) && GetCoin_Y <= (Coin_Position_Bottom + tolerance)
+                                        isRightSide && isWithinYRange
+                                    } else {
+                                        true // 沒看到數字座標，直接信任文字辨識結果
+                                    }
 
-                                        if (isRightSide && isWithinYRange) {
-                                            Log.d("RegexMatch", "第四階段：找到領取按鈕 -> GET_COIN_READY")
-                                            
-                                            val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
-                                            // 更新 Debug 資訊
-                                            GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
+                                    if (isPositionValid) {
+                                        Log.d("RegexMatch", "第四階段：找到領取按鈕 -> GET_COIN_READY")
+                                        
+                                        val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
+                                        // 更新 Debug 資訊
+                                        GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
 
-                                            nextState = CState.GET_COIN_READY
-                                            gFindCoinButNoTime = 0
-                                            floatingService?.resetFloatButtonLocation()
+                                        nextState = CState.GET_COIN_READY
+                                        gFindCoinButNoTime = 0
+                                        floatingService?.resetFloatButtonLocation()
 
-                                            touchClick(targetClickX, GetCoin_Y)
+                                        touchClick(targetClickX, GetCoin_Y)
 
-                                            if (coinValueToRecord > 0f) {
-                                                if (RecordCionLimiter.canCall()) {
-                                                    coinClaimStorage.addClaim(CoinClaim(amount = coinValueToRecord.toDouble()))
-                                                    floatingService?.updateRecordTextToday()
-                                                    
-                                                    // 💡 領取成功的當下，重置門檻為該時段的 UpValue
-                                                    val (T_hour, T_mins) = TimeLib.GetTime()
-                                                    findCurrentStrategy(T_hour, T_mins, DefaultStrategies)?.let { strategy ->
-                                                        GlobalValueHolder.coinValueSatisfy = strategy.PeriodUpValue
-                                                        Log.d("processCoinCase", "領取成功：重置門檻為 ${strategy.PeriodUpValue}")
-                                                    }
+                                        if (coinValueToRecord > 0f) {
+                                            if (RecordCionLimiter.canCall()) {
+                                                coinClaimStorage.addClaim(CoinClaim(amount = coinValueToRecord.toDouble()))
+                                                floatingService?.updateRecordTextToday()
+                                                
+                                                // 💡 領取成功的當下，重置門檻為該時段的 UpValue
+                                                val (T_hour, T_mins) = TimeLib.GetTime()
+                                                findCurrentStrategy(T_hour, T_mins, DefaultStrategies)?.let { strategy ->
+                                                    GlobalValueHolder.coinValueSatisfy = strategy.PeriodUpValue
+                                                    Log.d("processCoinCase", "領取成功：重置門檻為 ${strategy.PeriodUpValue}")
                                                 }
                                             }
-                                            serviceScope.launch { delay(3000L) }
-                                            isLoopBroken = true
-                                            break@OuterReg
                                         }
+                                        serviceScope.launch { delay(3000L) }
+                                        isLoopBroken = true
+                                        break@OuterReg
                                     }
                                 }
                             }
 
                             // 3. 處理「重試」按鈕 (第四階段)
                             val matches4 = regex4.find(line.text)
-                            if (matches4 != null && Coin_Position_x != 0f) {
+                            if (matches4 != null) {
                                 Log.d("move", "第四階段：找到重試 -> QuickRefreshPage")
                                 serviceScope.launch {
                                     MoveActionMutex.withLock { QuickRefreshPage() }
