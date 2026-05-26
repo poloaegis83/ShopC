@@ -98,6 +98,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
     private lateinit var storagePermissionLauncher: ActivityResultLauncher<Array<String>> // 儲存空間權限
+    private var showAccessibilityDialog by mutableStateOf(false)
     private lateinit var coinStorage: CoinClaimStorage
     private var floatingService: FloatingButtonService? = null
     private val serviceConnection = object : ServiceConnection {
@@ -150,9 +151,12 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
         checkAndRequestStoragePermissions()
 
-        //if (!isAccessibilityServiceEnabled(MyAccessibilityService::class.java)) {
-        //    Toast.makeText(this, "⚠️ 請開啟無障礙服務以啟用自動操作", Toast.LENGTH_LONG).show()
-        //}
+        // 💡 檢查無障礙服務狀態：包含「未開啟」以及「已開啟但沒在跑（異常）」
+        val isEnabled = isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
+        val isRunning = MyAccessibilityService.isRunning
+        if (!isEnabled || !isRunning) {
+            showAccessibilityDialog = true
+        }
 
         // MediaProjection 的權限 in 另一個 activity
         //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
@@ -192,6 +196,35 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 .scale(0.8f)
                             )
 
+                            if (showAccessibilityDialog) {
+                                val isEnabled = isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
+                                val isRunning = MyAccessibilityService.isRunning
+                                
+                                val dialogText = if (!isEnabled) {
+                                    "本程式需要「無障礙服務」權限才能自動執行點擊與滑動。請在設定中找到「蝦霸」並開啟服務。"
+                                } else {
+                                    "無障礙服務目前處於「異常狀態」（系統顯示已開啟但未正常運作）。這通常是 Android 系統的 Bug，請到設定中將「蝦霸」服務「關掉再重新打開」即可修復。"
+                                }
+
+                                AlertDialog(
+                                    onDismissRequest = { showAccessibilityDialog = false },
+                                    title = { Text(if (!isEnabled) "需要無障礙服務權限" else "無障礙服務狀態異常") },
+                                    text = { Text(dialogText) },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            showAccessibilityDialog = false
+                                            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                        }) {
+                                            Text("前往設定")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showAccessibilityDialog = false }) {
+                                            Text("取消")
+                                        }
+                                    }
+                                )
+                            }
                         }
                         SetPageItems()
                     }
@@ -1066,8 +1099,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         Text(
             text = text3,
-            modifier = Modifier.padding(top = 12.dp),
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
+            modifier = Modifier.padding(top = 12.dp)
+                .clickable {
+                    // 點擊後直接導航到設定頁面
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                },
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 18.sp, 
+                fontWeight = FontWeight.Bold, 
+                color = if (isEnabledAcService && MyAccessibilityService.isRunning) Color.Black else Color.Red
+            )
         )
     }
 
