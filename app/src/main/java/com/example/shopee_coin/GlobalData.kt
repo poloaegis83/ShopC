@@ -44,9 +44,9 @@ object GlobalValueHolder {
 
     // 💡 滑動參數動態調整 (factor = height / MoveDistance)
     // Default values (調整為較安全的係數，避免觸發系統手勢)
-    const val DEFAULT_NEXT_FACTOR = 3.5f
+    const val DEFAULT_NEXT_FACTOR = 2.5f
     const val DEFAULT_NEXT_LONG = 800L
-    const val DEFAULT_PREV_FACTOR = 3.5f
+    const val DEFAULT_PREV_FACTOR = 2.85f
     const val DEFAULT_PREV_LONG = 800L
 
     var nextMoveFactor by mutableStateOf(DEFAULT_NEXT_FACTOR)
