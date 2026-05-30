@@ -648,14 +648,14 @@ class ScreenCaptureService : Service() {
         }
 
         if (CoinStates == CState.WAITING_COIN) {
-            CallBack_Interval = 12000L
+            CallBack_Interval = (13000L..15000L).random()
             if(GlobalValueHolder.IsLowEndDevice){
                 CallBack_Interval = (CallBack_Interval.toFloat() * 1.51f).toLong()
             }
             Log.d("CallBack_Interval", " Long time (Waiting Coin) ")
             updateFloatButtonText("等待蝦幣完成")
         } else {
-            CallBack_Interval = 5500L
+            CallBack_Interval = (5700L..6200L).random()
             if(GlobalValueHolder.IsLowEndDevice){
                 CallBack_Interval = (CallBack_Interval.toFloat() * 2f).toLong()
             }
