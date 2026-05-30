@@ -979,40 +979,52 @@ class ScreenCaptureService : Service() {
     private suspend fun HandleCoinCase(bitmap: Bitmap) {
         val cutBitmap = BitmapCropLib.cropToTopRightQuarter(bitmap)
         
-        // 1. 準備金色增強圖 (專攻數字)
-        val goldEnhanced = BitmapCropLib.toGoldEnhanced(cutBitmap)
-        val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, UpscaleRate.toInt())
-        
-        // 2. 準備白色增強圖 (專攻時間/標題/按鈕)
+        // 1. 準備白色增強圖 (1倍解析度，負擔輕，用於第一階段標題檢查與時間)
         val whiteEnhanced = BitmapCropLib.toWhiteEnhanced(cutBitmap)
 
-        // 💡 儲存圖片到相簿 (DCIM/ShopC_Debug) - 僅在 ImageDebug 開啟時
-        if (GlobalValueHolder.isImageDebugMode) {
-            BitmapCropLib.saveBitmapToGallery(this, goldEnhancedUpscaled, "GoldFilter")
-            BitmapCropLib.saveBitmapToGallery(this, whiteEnhanced, "WhiteFilter")
-        }
+        // 進行第一階段辨識 (白色濾鏡)
+        recognizeTextAndHandleGesture(whiteEnhanced, this) { whiteResult ->
+            val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
+            val regex6 = Regex("[蝦轄遐].[直置真百].[任住低低仟伴尫彺往仁].[獎賞]")
+            
+            var foundHeader = false
+            for (block in whiteResult.textBlocks) {
+                for (line in block.lines) {
+                    if (regex5.find(line.text) != null || regex6.find(line.text) != null) {
+                        foundHeader = true
+                        break
+                    }
+                }
+                if (foundHeader) break
+            }
 
-        // 進行三路辨識 (以 gold 與 white 為主)
-        recognizeTextAndHandleGesture(cutBitmap, this) { normalResult ->
-            TextRecognizerUtil.recognizeTextFromImage(goldEnhancedUpscaled, this, { goldResult ->
-                TextRecognizerUtil.recognizeTextFromImage(whiteEnhanced, this, { whiteResult ->
+            if (foundHeader) {
+                // 💡 只有找到標題才執行後續重型運算：金色濾鏡與放大
+                Log.d("HandleCoinCase", "找到蝦幣標題，執行後續金色濾鏡辨識")
+                
+                // 2. 準備金色增強圖 (2倍放大，專攻數字)
+                val goldEnhanced = BitmapCropLib.toGoldEnhanced(cutBitmap)
+                val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, UpscaleRate.toInt())
+
+                // 💡 儲存圖片到相簿 (DCIM/ShopC_Debug) - 僅在 ImageDebug 開啟時
+                if (GlobalValueHolder.isImageDebugMode) {
+                    BitmapCropLib.saveBitmapToGallery(this, goldEnhancedUpscaled, "GoldFilter")
+                    BitmapCropLib.saveBitmapToGallery(this, whiteEnhanced, "WhiteFilter")
+                }
+
+                TextRecognizerUtil.recognizeTextFromImage(goldEnhancedUpscaled, this, { goldResult ->
                     processCoinCase(goldResult, whiteResult, bitmap.width)
-                    
-                    // 清理資源
                     goldEnhanced.recycle()
                     goldEnhancedUpscaled.recycle()
-                    whiteEnhanced.recycle()
                 }, {
                     goldEnhanced.recycle()
                     goldEnhancedUpscaled.recycle()
-                    whiteEnhanced.recycle()
                 })
-            }, {
-                goldEnhanced.recycle()
-                goldEnhancedUpscaled.recycle()
-                whiteEnhanced.recycle()
-            })
+            } else {
+                Log.d("HandleCoinCase", "未發現蝦幣標題，早退跳過後續運算")
+            }
         }
+        // 注意：cutBitmap 在 recognizeTextAndHandleGesture 結束後會自動被其內部的 recycle 回收
     }
 
     private fun last_notZero( Value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
