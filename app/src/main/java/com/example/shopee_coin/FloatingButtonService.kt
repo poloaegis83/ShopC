@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -23,7 +24,6 @@ import androidx.core.content.edit
 import java.util.Calendar
 import kotlin.math.absoluteValue
 
-//var IsOn: Boolean = false
 class FloatingButtonService : Service() {
 
     private lateinit var windowManager: WindowManager
@@ -34,8 +34,8 @@ class FloatingButtonService : Service() {
     private lateinit var debugText: TextView
     private val binder = LocalBinder()
 
-    val initX = 60
-    val initY = 1130
+    private val initX = 60
+    private val initY = 1130
 
     inner class LocalBinder : Binder() {
         fun getService(): FloatingButtonService = this@FloatingButtonService
@@ -56,13 +56,17 @@ class FloatingButtonService : Service() {
         debugText = floatingView.findViewById(R.id.debugText)
         button = floatingView.findViewById(R.id.floatingButton)
 
+        @Suppress("DEPRECATION")
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+            overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
@@ -74,16 +78,16 @@ class FloatingButtonService : Service() {
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         // 💡 啟動時強制同步狀態：讓 isOn 變數與 Preferences 保持一致，並更新 UI
-        GlobalValueHolder.isOn = false 
+        GlobalValueHolder.isOn = false
         prefs.edit { putBoolean("OCR_ENABLED", false) }
-        
+
         // 💡 載入上次自動停止的日期
         GlobalValueHolder.lastAutoStopDay = prefs.getInt("LAST_AUTO_STOP_DAY", -1)
 
         // 💡 確保按鈕圖示與文字正確反映初始的 false 狀態
         updateButtonUI()
 
-// 拖曳與點擊邏輯
+        // 拖曳與點擊邏輯
         button.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
@@ -161,7 +165,7 @@ class FloatingButtonService : Service() {
     private fun onFloatingButtonClick() {
         GlobalValueHolder.isOn = !GlobalValueHolder.isOn
         updateButtonUI()
-        
+
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         prefs.edit { putBoolean("OCR_ENABLED", GlobalValueHolder.isOn) }
         Log.d("Float Button", "Feature FB ${GlobalValueHolder.isOn}")
@@ -177,12 +181,10 @@ class FloatingButtonService : Service() {
         button.setImageResource(resId)
     }
 
-    fun updateOnOff(status:Boolean) {
+    fun updateOnOff(status: Boolean) {
         GlobalValueHolder.isOn = status
-        val resId = if (GlobalValueHolder.isOn) R.drawable.on_button else R.drawable.off_button
-        button.setImageResource(resId)
+        updateButtonUI()
     }
-
 
     override fun onDestroy() {
         super.onDestroy()
@@ -202,8 +204,8 @@ class FloatingButtonService : Service() {
         val fontScale = resources.configuration.fontScale
         val scaleLimit = fontScale.coerceIn(1f, maxFontScale)
 
-        val adjustedSize1 = statusText.textSize / fontScale * scaleLimit
-        val adjustedSize2 = recordText.textSize / fontScale * scaleLimit
+        val adjustedSize1 = (statusText.textSize / fontScale) * scaleLimit
+        val adjustedSize2 = (recordText.textSize / fontScale) * scaleLimit
 
         statusText.setTextSize(COMPLEX_UNIT_PX, adjustedSize1)
         recordText.setTextSize(COMPLEX_UNIT_PX, adjustedSize2)
@@ -233,11 +235,11 @@ class FloatingButtonService : Service() {
     private fun updateDebugVisibility() {
         val layoutParams = floatingView.layoutParams as WindowManager.LayoutParams
         val displayMetrics = resources.displayMetrics
-        
+
         if (GlobalValueHolder.isDebugMode) {
             debugText.visibility = View.VISIBLE
             debugText.text = GlobalValueHolder.debugText
-            
+
             // 增加寬度以容納 Debug 資訊，上限為螢幕 1/3
             val targetWidth = (displayMetrics.widthPixels / 3.2f).toInt()
             if (layoutParams.width != targetWidth) {
@@ -279,13 +281,6 @@ class FloatingButtonService : Service() {
         }
     }
 
-    @SuppressLint("SetTextI18n")
-    fun updateRecordText(times: Int, sum: Float) {
-        Handler(Looper.getMainLooper()).post {
-            recordText.text = "${times}次,共:${sum}"
-        }
-    }
-
     fun updateRecordTextToday() {
         val calendar = Calendar.getInstance()
         val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
@@ -302,21 +297,22 @@ class FloatingButtonService : Service() {
         val truncatedTotal = (todayTotal * 10).toInt() / 10f
 
         Handler(Looper.getMainLooper()).post {
-            recordText.text = "${todayCount}次, ${truncatedTotal}元"
+            @SuppressLint("SetTextI18n")
+            recordText.text = "$todayCount 次, $truncatedTotal 元"
 
             // 💡 領滿 100 次自動停止邏輯 (每天僅限一次)
             if (todayCount >= 100 && GlobalValueHolder.lastAutoStopDay != currentDay && GlobalValueHolder.isOn) {
                 GlobalValueHolder.lastAutoStopDay = currentDay
                 updateOnOff(false)
                 updateStatusText("今天已領滿")
-                
+
                 // 同步更新持久化狀態
                 val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-                prefs.edit { 
+                prefs.edit {
                     putBoolean("OCR_ENABLED", false)
                     putInt("LAST_AUTO_STOP_DAY", currentDay)
                 }
-                
+
                 Log.d("FloatingButtonService", "今日領取已達 100 次，執行自動停止")
             }
         }

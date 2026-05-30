@@ -1,7 +1,5 @@
 package com.example.shopee_coin
 
-//import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import com.google.mlkit.vision.common.InputImage
@@ -25,9 +23,8 @@ object TextRecognizerUtil {
     // 公開函式，可供全 app 使用
     fun recognizeTextFromImage(
         bitmap: Bitmap,
-        context: Context,
         onResult: (Text) -> Unit,
-        onError: (Exception) -> Unit
+        onError: (Exception) -> Unit,
     ) {
         val image = InputImage.fromBitmap(bitmap, 0)
 

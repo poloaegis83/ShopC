@@ -43,30 +43,25 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-var CoinValueList = mutableListOf (0f)
-
 class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val UpscaleRate = 2f
+    private val upscaleRate = 2f
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
-    private var lastCaptureTime = 0L
-    val MoveActionMutex = Mutex()
-    //var isOn = false
-    var CallBack_Interval = 5000L
-    var NotFindConter = 0
-    var SearchCount = 0
-    // var CoinValueSatisfy = GlobalValueHolder.DownValue // 已移至 GlobalValueHolder
-    var Full_refresh_Position_x  = 0f
-    var Full_refresh_Position_y  = 0f
+    val moveActionMutex = Mutex()
+    var callBackInterval = 5000L
+    var notFindConter = 0
+    var searchCount = 0
+    var fullRefreshPositionX  = 0f
+    var fullRefreshPositionY  = 0f
 
     var isDuringRestart = false
 
-    var GetCoinFreezeCount = 0
+    var getCoinFreezeCount = 0
 
-    var CoinStates = CState.COIN_START
+    var coinStates = CState.COIN_START
 
     // 狀態丟失計計數器 (用於 WAITING_COIN 豁免)
     private var stateLossCounter = 0
@@ -74,16 +69,14 @@ class ScreenCaptureService : Service() {
     // 優化：回溯導航 (Backtracking)
     private val roomHistoryMap = mutableMapOf<Int, Pair<Float, Long>>()
     private var currentRoomIndex = 0
-    private val HISTORY_TTL = 5 * 60 * 1000L // 5分鐘內有效
+    private val historyTtl = 5 * 60 * 1000L // 5分鐘內有效
 
-    var checkLiveStreamingPage_retry_count = 0
-    var notInLiveStreamingPage_reopen_request = false
+    var checkLiveStreamingPageRetryCount = 0
+    var notInLiveStreamingPageReopenRequest = false
     var findShopeeMainPage = false
 
-    var mainPageStreamLiveEntry_x = 0f
-    var mainPageStreamLiveEntry_y = 0f
-
-    //val CoinClaimStorage = CoinClaimStorage(this)
+    var mainPageStreamLiveEntryX = 0f
+    var mainPageStreamLiveEntryY = 0f
 
     enum class CState {
         COIN_START ,GET_COIN_READY, WAITING_COIN, SEARCHING_COIN, PAGE_COIN_NOT_FIND, NOT_FIND_DOING_FRESH, COIN_VAULE_FIND
@@ -95,14 +88,13 @@ class ScreenCaptureService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
 
     private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val SingleServiceScope = CoroutineScope(singleThreadDispatcher + serviceJob)
+    private val singleServiceScope = CoroutineScope(singleThreadDispatcher + serviceJob)
 
-    val metrics = Resources.getSystem().displayMetrics
+    val metrics: android.util.DisplayMetrics = Resources.getSystem().displayMetrics
 
-    var IsMLCallback = false
     private lateinit var coinClaimStorage: CoinClaimStorage
 
-    var waiting_live_checker = false
+    var waitingLiveChecker = false
 
     // Debug 資訊變數已移至 GlobalValueHolder
 
@@ -136,8 +128,8 @@ class ScreenCaptureService : Service() {
 
         fun canCall(): Boolean {
             val now = System.currentTimeMillis()
-            val Millis = 30 * 1000  // 30 秒
-            return if (now - lastCallTime >= Millis) {
+            val millis = 30 * 1000  // 30 秒
+            return if (now - lastCallTime >= millis) {
                 lastCallTime = now
                 true
             } else {
@@ -151,17 +143,14 @@ class ScreenCaptureService : Service() {
 
         fun canCall(): Boolean {
             val now = System.currentTimeMillis()
-            val Millis = 15 * 1000  //  2 mins
+            val millis = 15 * 1000  //  2 mins
 
-            return if (now - lastCallTime >= Millis) {
+            return if (now - lastCallTime >= millis) {
                 lastCallTime = now
                 true
             } else {
                 false
             }
-        }
-        fun passCall() {
-            lastCallTime = 0
         }
     }
 
@@ -181,27 +170,11 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    object CoinButtonLimiter {
-        private var lastCallTime: Long = 0L  // 儲存上次成功呼叫的時間
-
-        fun canCall(): Boolean {
-            val now = System.currentTimeMillis()
-            val twoMinutesMillis = 2 * 60 * 1000  // 2分鐘 = 300,000 毫秒
-
-            return if (now - lastCallTime >= twoMinutesMillis) {
-                lastCallTime = now
-                true
-            } else {
-                false
-            }
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         coinClaimStorage = CoinClaimStorage(this)  // this 是 context
         val intent = Intent(this, FloatingButtonService::class.java)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        bindService(intent, connection, BIND_AUTO_CREATE)
         
         // 💡 啟動測試滑動 Loop (不依賴螢幕錄製權限)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -224,13 +197,13 @@ class ScreenCaptureService : Service() {
                     }
                     try {
                         Log.d("SwipeTest", "執行測試滑動: 下一房 -> 上一房")
-                        MoveActionMutex.withLock {
+                        moveActionMutex.withLock {
                             moveNextPage()
                         }
                         delay(5000L)
                         // 二次檢查防止延遲期間使用者已關閉測試
                         if (GlobalValueHolder.isSwipeTesting) {
-                            MoveActionMutex.withLock {
+                            moveActionMutex.withLock {
                                 movePreviousPage()
                             }
                         }
@@ -263,6 +236,7 @@ class ScreenCaptureService : Service() {
         val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent?.getParcelableExtra("resultData", Intent::class.java)
         } else {
+            @Suppress("DEPRECATION")
             intent?.getParcelableExtra("resultData")
         }
 
@@ -279,7 +253,7 @@ class ScreenCaptureService : Service() {
                 setupMediaProjection()
                 setupVirtualDisplay()
                 serviceScope.launch {
-                    SearchLogic(true)
+                    searchLogic(true)
                 }
                 startCaptureLoopNew()
                 isRunning = true
@@ -327,19 +301,19 @@ class ScreenCaptureService : Service() {
     private var captureJob: Job? = null
     private var isActive = true
     private var isInExecuteTime = true
-    private var Counter = 0
+    private var counter = 0
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun startCaptureLoopNew() {
-        captureJob = SingleServiceScope.launch {
+        captureJob = singleServiceScope.launch {
             while (isActive) {
-                if (Counter%10 == 0) {
+                if (counter%10 == 0) {
                     isInExecuteTime = isNowInTimeRangeCheck()
                 }
                 if(isInExecuteTime){
                     captureScreenFrame()
                     intervalModifier()
-                    delay(CallBack_Interval)
+                    delay(callBackInterval)
                 } else {
                     if (GlobalValueHolder.isOn) {
                         // 不在執行時間，睡個較長時間減輕 CPU 負擔
@@ -349,7 +323,7 @@ class ScreenCaptureService : Service() {
                         } else {
                             delay(3500L)
                             updateFloatButtonText("待時段內將自動開蝦皮")
-                            if (!MyAccessibilityService.checkForegroundMyApp() && Counter%3 == 0){
+                            if (!MyAccessibilityService.checkForegroundMyApp() && counter%3 == 0){
                                 openMyApp()
                             }
                             delay(3500L)
@@ -358,7 +332,7 @@ class ScreenCaptureService : Service() {
                         updateFloatButtonText("⏸\uFE0F暫停時段 & 按鈕關閉")
                     }
                 }
-                Counter = (Counter + 1) % 10
+                counter = (counter + 1) % 10
             }
         }
     }
@@ -386,24 +360,11 @@ class ScreenCaptureService : Service() {
         val nowTotalMinutes = hour * 60 + mins
 
         return strategies.find { strategy ->
-            val startMinutes = strategy.Start_Hour * 60 + strategy.Start_Mins
-            val endMinutes = strategy.End_Hour * 60 + strategy.End_Mins
+            val startMinutes = strategy.startHour * 60 + strategy.startMins
+            val endMinutes = strategy.endHour * 60 + strategy.endMins
             nowTotalMinutes in startMinutes until endMinutes
         }
     }
-/*
-    private fun AddCoinList(AddValue :Float){
-        CoinValueList.add(AddValue)
-    }
-
-    private fun PopCoinList(){
-        CoinValueList.removeAt(CoinValueList.lastIndex)
-    }
-
-    private fun CleanCoinList(){
-        CoinValueList = mutableListOf (0f)
-    }
-*/
 
     fun updateFloatButtonText(text: String) {
         if (isBound) {
@@ -450,66 +411,66 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun SearchLogic(IsInit: Boolean) {
+    private suspend fun searchLogic(isInit: Boolean) {
         // ...
-        val (T_hour, T_mins) = TimeLib.GetTime()
-        var UpValueNow = 0f
-        var DownValueNow = 0f
-        var MinusValueNow = 0f
-        var RefreshCountNow = 10
-        val currentTStrategy = findCurrentStrategy(T_hour, T_mins, DefaultStrategies)
+        val (tHour, tMins) = TimeLib.GetTime()
+        var upValueNow = 0f
+        var downValueNow = 0f
+        var minusValueNow = 0f
+        var refreshCountNow = 10
+        val currentTStrategy = findCurrentStrategy(tHour, tMins, DefaultStrategies)
 
         if (currentTStrategy != null) {
             Log.d("CoinStrategy", "目前時段策略：$currentTStrategy")
-            UpValueNow = currentTStrategy.PeriodUpValue
-            DownValueNow = currentTStrategy.PeriodDownValue
-            MinusValueNow = currentTStrategy.CoinValueMinus
-            RefreshCountNow = currentTStrategy.RefreshCount
+            upValueNow = currentTStrategy.periodUpValue
+            downValueNow = currentTStrategy.periodDownValue
+            minusValueNow = currentTStrategy.coinValueMinus
+            refreshCountNow = currentTStrategy.refreshCount
             
             // 更新 Debug 資訊
-            GlobalValueHolder.debugUpValue = UpValueNow
-            GlobalValueHolder.debugDownValue = DownValueNow
+            GlobalValueHolder.debugUpValue = upValueNow
+            GlobalValueHolder.debugDownValue = downValueNow
             GlobalValueHolder.debugPeriodInfo = String.format(java.util.Locale.US, "%02d:%02d-%02d:%02d", 
-                currentTStrategy.Start_Hour, currentTStrategy.Start_Mins, 
-                currentTStrategy.End_Hour, currentTStrategy.End_Mins)
+                currentTStrategy.startHour, currentTStrategy.startMins, 
+                currentTStrategy.endHour, currentTStrategy.endMins)
         } else {
             Log.d("CoinStrategy", "目前沒有適用的策略")
-            UpValueNow = 0.3f
-            DownValueNow = 0.2f
-            MinusValueNow = 0.1f
-            RefreshCountNow = 5
-            GlobalValueHolder.debugUpValue = UpValueNow
-            GlobalValueHolder.debugDownValue = DownValueNow
+            upValueNow = 0.3f
+            downValueNow = 0.2f
+            minusValueNow = 0.1f
+            refreshCountNow = 5
+            GlobalValueHolder.debugUpValue = upValueNow
+            GlobalValueHolder.debugDownValue = downValueNow
             GlobalValueHolder.debugPeriodInfo = "No Strategy"
         }
         if (GlobalValueHolder.DownValue != 0f) {
             //
             // Override by User input
             //
-            DownValueNow = GlobalValueHolder.DownValue
+            downValueNow = GlobalValueHolder.DownValue
         }
-        if (IsInit) {
-            GlobalValueHolder.coinValueSatisfy = UpValueNow
+        if (isInit) {
+            GlobalValueHolder.coinValueSatisfy = upValueNow
         } else {
-            if (CoinStates == CState.NOT_FIND_DOING_FRESH) {
-                Log.d("SearchLogic", "CState.PAGE_COIN_NOT_FIND SearchCount += 1")
-                SearchCount += 1
-            } else if (CoinStates == CState.WAITING_COIN || CoinStates == CState.GET_COIN_READY) {
-                SearchCount = 0
+            if (coinStates == CState.NOT_FIND_DOING_FRESH) {
+                Log.d("SearchLogic", "CState.PAGE_COIN_NOT_FIND searchCount += 1")
+                searchCount += 1
+            } else if (coinStates == CState.WAITING_COIN || coinStates == CState.GET_COIN_READY) {
+                searchCount = 0
             }
-            if (CoinStates == CState.WAITING_COIN) {
+            if (coinStates == CState.WAITING_COIN) {
                 Log.d("SearchLogic", "CState.WAITING_COIN")
             }
 
-            Log.d("SearchLogic", "SearchCount = $SearchCount, CoinValueSatisfy = ${GlobalValueHolder.coinValueSatisfy}")
-            if (CoinStates  == CState.NOT_FIND_DOING_FRESH) {
-                if (SearchCount > RefreshCountNow) {
-                    val nextSatisfy = maxOf(DownValueNow, GlobalValueHolder.coinValueSatisfy - MinusValueNow)
+            Log.d("SearchLogic", "searchCount = $searchCount, CoinValueSatisfy = ${GlobalValueHolder.coinValueSatisfy}")
+            if (coinStates  == CState.NOT_FIND_DOING_FRESH) {
+                if (searchCount > refreshCountNow) {
+                    val nextSatisfy = maxOf(downValueNow, GlobalValueHolder.coinValueSatisfy - minusValueNow)
                     
                     // 嘗試回溯：在歷史紀錄中尋找符合 nextSatisfy 的房間
                     val now = System.currentTimeMillis()
                     val bestPastRoom = roomHistoryMap.filter { 
-                        it.value.second > now - HISTORY_TTL && it.value.first >= nextSatisfy 
+                        it.value.second > now - historyTtl && it.value.first >= nextSatisfy 
                     }.maxByOrNull { it.value.first }
 
                     if (bestPastRoom != null && bestPastRoom.key < currentRoomIndex) {
@@ -518,9 +479,9 @@ class ScreenCaptureService : Service() {
                         Log.d("SearchLogic", "找到歷史優質房間: Index $targetIndex, Value ${bestPastRoom.value.first}, 回滑 $stepsBack 次")
                         
                         GlobalValueHolder.coinValueSatisfy = nextSatisfy
-                        SearchCount = 0
+                        searchCount = 0
                         
-                        MoveActionMutex.withLock {
+                        moveActionMutex.withLock {
                             repeat(stepsBack) {
                                 movePreviousPage()
                                 delay(5000L) // 等待動畫穩定
@@ -528,10 +489,10 @@ class ScreenCaptureService : Service() {
                         }
                     } else {
                         // 無歷史可用，執行原始的全域刷新邏輯
-                        SearchCount = 0
+                        searchCount = 0
                         GlobalValueHolder.coinValueSatisfy = nextSatisfy
                         Log.d("SearchLogic", "無合適歷史，執行 FullFreshPage")
-                        FullFreshPage()
+                        fullFreshPage()
                     }
                 }
             }
@@ -563,30 +524,19 @@ class ScreenCaptureService : Service() {
                     if (driveSuccess) {
                         liveStreamPageCorrection()
                     }
-                    lastState = CoinStates
+                    lastState = coinStates
 
-                } else if ( notInLiveStreamingPage_reopen_request) {
+                } else if ( notInLiveStreamingPageReopenRequest) {
                     isDuringRestart = true
-                    notInLiveStreamingPage_reopen_request = false
+                    notInLiveStreamingPageReopenRequest = false
                     driveSuccess = backToMainAndDriveToStream()
                     if (driveSuccess) {
                         liveStreamPageCorrection()
                     }
-                    lastState = CoinStates
+                    lastState = coinStates
                 }
             } finally {
                 isDuringRestart = false
-                /*if ( !MyAccessibilityService.checkForegroundApp()) {
-                    AppShopCheckerLimiter.passCall()
-                }
-                if (!driveSuccess) {
-                    Log.d("appCheckRestart", "reopenShopeeApp2")
-                    delay(3000L)
-                    MyAccessibilityService.performHome()
-                    delay(5000L)
-                    reopenShopeeApp(this,2)
-                    AppShopCheckerLimiter.passCall()
-                }*/
             }
         }
     }
@@ -614,15 +564,15 @@ class ScreenCaptureService : Service() {
             if (retry > 10) {
               break
             }
-            PlatformBackGesture()
+            platformBackGesture()
             checkShopeeMainPage()
             delay(6000L)
             retry += 1
         }
         if (findShopeeMainPage) {
             delay(5000L)
-            mainPageStreamLiveEntry_x = metrics.widthPixels / 2f
-            touchClick (mainPageStreamLiveEntry_x,mainPageStreamLiveEntry_y - 12f)
+            mainPageStreamLiveEntryX = metrics.widthPixels / 2f
+            touchClick (mainPageStreamLiveEntryX,mainPageStreamLiveEntryY - 12f)
             delay(3000L)
             return true
         } else {
@@ -637,7 +587,7 @@ class ScreenCaptureService : Service() {
         if (!MyAccessibilityService.isRunning) {
             Log.e("updateFloatButtonText", "錯誤:請重開無障礙服務")
             updateFloatButtonText("❌:請打開(重開)無障礙服務")
-            CallBack_Interval = 6000L
+            callBackInterval = 6000L
             return
         }
 
@@ -647,25 +597,25 @@ class ScreenCaptureService : Service() {
             return
         }
 
-        if (CoinStates == CState.WAITING_COIN) {
-            CallBack_Interval = (13000L..15000L).random()
+        if (coinStates == CState.WAITING_COIN) {
+            callBackInterval = (13000L..15000L).random()
             if(GlobalValueHolder.IsLowEndDevice){
-                CallBack_Interval = (CallBack_Interval.toFloat() * 1.51f).toLong()
+                callBackInterval = (callBackInterval.toFloat() * 1.51f).toLong()
             }
-            Log.d("CallBack_Interval", " Long time (Waiting Coin) ")
+            Log.d("callBackInterval", " Long time (Waiting Coin) ")
             updateFloatButtonText("等待蝦幣完成")
         } else {
-            CallBack_Interval = (5700L..6200L).random()
+            callBackInterval = (5700L..6200L).random()
             if(GlobalValueHolder.IsLowEndDevice){
-                CallBack_Interval = (CallBack_Interval.toFloat() * 2f).toLong()
+                callBackInterval = (callBackInterval.toFloat() * 2f).toLong()
             }
-            Log.d("CallBack_Interval", " Short Time")
+            Log.d("callBackInterval", " Short Time")
             updateFloatButtonText("尋找蝦幣中")
         }
-        Log.d("CallBack_Interval", "Normal Mode → Interval: $CallBack_Interval ms")
+        Log.d("callBackInterval", "Normal Mode → Interval: $callBackInterval ms")
     }
 
-    private fun StartAndCheckSkip():Boolean {
+    private fun startAndCheckSkip():Boolean {
 
         if (isDuringRestart) {
             return true
@@ -677,9 +627,6 @@ class ScreenCaptureService : Service() {
         } else {
             Log.d("gIsCapturing", "gIsCapturing no")
         }
-
-        val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        //GlobalValueHolder.isOn = prefs.getBoolean("OCR_ENABLED", false)
 
         if (GlobalValueHolder.isOn) {
             Log.d("OCR_Line", "Feature Open")
@@ -693,8 +640,8 @@ class ScreenCaptureService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     private suspend fun captureScreenFrame() {
-        Log.d("CoinStates", "$CoinStates")
-        if (StartAndCheckSkip()) {
+        Log.d("coinStates", "$coinStates")
+        if (startAndCheckSkip()) {
             //imageReader?.acquireLatestImage()?.close()
             gIsCapturing = false
             Log.d("captureScreenFrame", "SKIP")
@@ -703,7 +650,7 @@ class ScreenCaptureService : Service() {
 
         appCheckRestart()
 
-        SearchLogic(false)
+        searchLogic(false)
 
         Log.d("captureScreenFrame", "GO")
         gIsCapturing = true
@@ -711,7 +658,7 @@ class ScreenCaptureService : Service() {
         // 重置 Debug 資訊
         // 💡 只有在狀態切換回 SEARCHING_COIN 時才重置資訊，
         // 這樣可以讓抓到的 CoinVal 在畫面上留久一點
-        if (CoinStates == CState.SEARCHING_COIN) {
+        if (coinStates == CState.SEARCHING_COIN) {
             GlobalValueHolder.debugCoinPosValue = "Non"
             GlobalValueHolder.debugGetPos = "Non"
             GlobalValueHolder.debugLineText = ""
@@ -719,7 +666,7 @@ class ScreenCaptureService : Service() {
         }
 
         Log.d("acquireLatestImage", "acquireLatestImage Start")
-        val image = MoveActionMutex.withLock {
+        val image = moveActionMutex.withLock {
             imageReader?.acquireLatestImage()
         }
         if (image == null) {
@@ -729,7 +676,7 @@ class ScreenCaptureService : Service() {
         Log.d("acquireLatestImage", "acquireLatestImage End")
 
         TimeLib.GetTime()
-        if (CoinStates == CState.NOT_FIND_DOING_FRESH){
+        if (coinStates == CState.NOT_FIND_DOING_FRESH){
             delay(500L)
         }
 
@@ -737,8 +684,8 @@ class ScreenCaptureService : Service() {
         try {
             bitmap = getBitmapFromImage(image)
             checkInLiveStreamingPage(bitmap)
-            HandleEventCase(bitmap)
-            HandleCoinCase(bitmap)
+            handleEventCase(bitmap)
+            handleCoinCase(bitmap)
         } catch (e: Exception) {
             Log.e("processImage", "Error: ${e.message}")
         } finally {
@@ -753,8 +700,8 @@ class ScreenCaptureService : Service() {
                                "Peri(${GlobalValueHolder.debugPeriodInfo})\n" +
                                "CoinVal:${GlobalValueHolder.debugCoinPosValue}\n" +
                                "GetBtn:${GlobalValueHolder.debugGetPos}\n" +
-                               "Intv:$CallBack_Interval ms\n" +
-                               "Sta:$CoinStates"
+                               "Intv:$callBackInterval ms\n" +
+                               "Sta:$coinStates"
                 if (GlobalValueHolder.debugLineText.isNotEmpty()) {
                     debugMsg += "\nTxt:${GlobalValueHolder.debugLineText}"
                 }
@@ -772,15 +719,14 @@ class ScreenCaptureService : Service() {
         val width = Resources.getSystem().displayMetrics.widthPixels
         val height = Resources.getSystem().displayMetrics.heightPixels
 
-        val density = Resources.getSystem().displayMetrics.densityDpi
-        Log.d("displayMetrics.width  Pixels", "width =: ${width} , height =: ${height}")
+        Log.d("displayMetrics.width  Pixels", "width =: $width , height =: $height")
         val planes = imageIn.planes
         val buffer = planes[0].buffer
         val pixelStride = planes[0].pixelStride
         val rowStride = planes[0].rowStride
         val rowPadding = rowStride - pixelStride * width
 
-        Log.d("rowPadding", "rowPadding =: ${rowPadding} , pixelStride =: ${pixelStride}, rowPadding / pixelStride = ${rowPadding / pixelStride} ")
+        Log.d("rowPadding", "rowPadding =: $rowPadding , pixelStride =: $pixelStride, rowPadding / pixelStride = ${rowPadding / pixelStride} ")
 
         val bitmapWithPadding = createBitmap(imageIn.width + rowPadding / pixelStride, imageIn.height, Bitmap.Config.ARGB_8888)
         bitmapWithPadding.copyPixelsFromBuffer(buffer)
@@ -789,31 +735,29 @@ class ScreenCaptureService : Service() {
         return finalBitmap
     }
 
-    var Y_axis_shift = 0f
+    var yAxisShift = 0f
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun HandleEventCase(bitmap: Bitmap) {
+    private suspend fun handleEventCase(bitmap: Bitmap) {
 
-        if (Full_refresh_Position_x == 0f && Full_refresh_Position_y == 0f) {
-            UpdatePositionForFullFreshPage(bitmap)
+        if (fullRefreshPositionX == 0f && fullRefreshPositionY == 0f) {
+            updatePositionForFullFreshPage(bitmap)
         }
 
-        Y_axis_shift = bitmap.height.toFloat() / 4f
+        yAxisShift = bitmap.height.toFloat() / 4f
 
         val cutBitmapHalf = BitmapCropLib.cropToVerticalMiddleTwo (bitmap)
 
         //
         // 領取 , 未獲得寵粉紅包雨 , 你贏得了
         //
-        recognizeTextAndHandleGesture(cutBitmapHalf, this) { resultText ->
+        recognizeTextAndHandleGesture(cutBitmapHalf) { resultText ->
             processEventCase(resultText, bitmap.height)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun processEventCase(resultText: Text, screenshotHeight: Int) {
-        var positionYGetCoinButton = 0f
-        var positionYGAP = 0f
-        var m_national_check = 0
+        var mNationalCheck = 0
 
         val regex15 = Regex("^[提媞堤隄瑅捷碍][領领須须後铁]") //提領按鈕
         val regex14 = Regex("[待徍诗侍倚恃律][提媞堤隄瑅捷碍][領领須须後铁][蝦轄遐].") //待提領蝦幣
@@ -857,7 +801,7 @@ class ScreenCaptureService : Service() {
                 serviceScope.launch {
                     //touchClick(clickX, clickY)
                     delay(4000L)
-                    PlatformBackGesture()
+                    platformBackGesture()
                 }
                 return // 中斷後續一般處理
             }
@@ -878,7 +822,7 @@ class ScreenCaptureService : Service() {
                     val matches12 = regex12.find(line.text)
                     var matches13: MatchResult? = null
 
-                    if (m_national_check == 1) {
+                    if (mNationalCheck == 1) {
                         matches13 = regex13.find(line.text)
                     }
 
@@ -888,7 +832,7 @@ class ScreenCaptureService : Service() {
 
                     if (matches11 != null && findSubscribe){
                         line.boundingBox?.let { box ->
-                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + yAxisShift )
                         }
                         findSubscribe = false
                     }
@@ -898,6 +842,7 @@ class ScreenCaptureService : Service() {
                     }
 
                     if (GlobalValueHolder.isOldCompatibilityMode) {
+                        var positionYGetCoinButton = 0f
                         if (matches9 != null && !coinValueFind) {
                             Log.d("RegexMatch9", "直播 coin --> ${matches9.groups[1]?.value?.toFloat()}")
                             coinValue = matches9.groups[1]?.value?.toFloat()!!
@@ -918,12 +863,12 @@ class ScreenCaptureService : Service() {
                             }
                             
                             val currentY = realY(line.boundingBox?.bottom?.toFloat()!!, screenshotHeight.toFloat() / 4f)
-                            positionYGAP = currentY - positionYGetCoinButton
+                            var positionYGAP = currentY - positionYGetCoinButton
                             if (positionYGetCoinButton == 0f) positionYGAP = 98f
 
                             val clickY = currentY + positionYGAP * 1.5f + gTotalHeight / 4
                             serviceScope.launch {
-                                MoveActionMutex.withLock {
+                                moveActionMutex.withLock {
                                     touchClick(metrics.widthPixels / 2f, clickY)
                                 }
                             }
@@ -932,7 +877,7 @@ class ScreenCaptureService : Service() {
 
                     if (matches2 != null || matches3 != null || matches4 != null || matches8 != null) {
                         Log.d("RegexMatch", "找到  獎勵派發 or 未獲得寵粉 or 未獲得紅包  or 關注主播參加活動")
-                        PlatformBackGesture()
+                        platformBackGesture()
                     }
                     if (matches5 != null) {
                         CoroutineScope(Dispatchers.Main).launch {
@@ -943,28 +888,28 @@ class ScreenCaptureService : Service() {
                         }
                     }
                     if (matches6 != null) {
-                        Log.d("move", "網路連線 with QuickRefreshPage")
+                        Log.d("move", "網路連線 with quickRefreshPage")
                         serviceScope.launch {
-                            MoveActionMutex.withLock {
-                                QuickRefreshPage()
+                            moveActionMutex.withLock {
+                                quickRefreshPage()
                             }
                         }
                     }
                     if (matches7 != null) {
                         line.boundingBox?.let { box ->
-                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + yAxisShift )
                         }
                     }
                     if (matches12 != null) {
                         Log.d("find", "警報")
-                        m_national_check = 1
+                        mNationalCheck = 1
                     }
-                    if (m_national_check == 1 && matches13 != null) {
+                    if (mNationalCheck == 1 && matches13 != null) {
                         Log.d("find", "警報 點級")
                         line.boundingBox?.let { box ->
-                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + Y_axis_shift )
+                            touchClick(box.centerX().toFloat(), box.bottom.toFloat()  + yAxisShift )
                         }
-                        m_national_check = 0
+                        mNationalCheck = 0
                     }
                 }
             }
@@ -976,16 +921,16 @@ class ScreenCaptureService : Service() {
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun HandleCoinCase(bitmap: Bitmap) {
+    private suspend fun handleCoinCase(bitmap: Bitmap) {
         val cutBitmap = BitmapCropLib.cropToTopRightQuarter(bitmap)
         
         // 1. 準備白色增強圖 (1倍解析度，負擔輕，用於第一階段標題檢查與時間)
         val whiteEnhanced = BitmapCropLib.toWhiteEnhanced(cutBitmap)
 
         // 進行第一階段辨識 (白色濾鏡)
-        recognizeTextAndHandleGesture(whiteEnhanced, this) { whiteResult ->
+        recognizeTextAndHandleGesture(whiteEnhanced) { whiteResult ->
             val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
-            val regex6 = Regex("[蝦轄遐].[直置真百].[任住低低仟伴尫彺往仁].[獎賞]")
+            val regex6 = Regex("[蝦轄遐].[直置真百].[任住低仟伴尫彺往仁].[獎賞]")
             
             var foundHeader = false
             for (block in whiteResult.textBlocks) {
@@ -1004,7 +949,7 @@ class ScreenCaptureService : Service() {
                 
                 // 2. 準備金色增強圖 (2倍放大，專攻數字)
                 val goldEnhanced = BitmapCropLib.toGoldEnhanced(cutBitmap)
-                val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, UpscaleRate.toInt())
+                val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, upscaleRate.toInt())
 
                 // 💡 儲存圖片到相簿 (DCIM/ShopC_Debug) - 僅在 ImageDebug 開啟時
                 if (GlobalValueHolder.isImageDebugMode) {
@@ -1012,7 +957,7 @@ class ScreenCaptureService : Service() {
                     BitmapCropLib.saveBitmapToGallery(this, whiteEnhanced, "WhiteFilter")
                 }
 
-                TextRecognizerUtil.recognizeTextFromImage(goldEnhancedUpscaled, this, { goldResult ->
+                TextRecognizerUtil.recognizeTextFromImage(goldEnhancedUpscaled, { goldResult ->
                     processCoinCase(goldResult, whiteResult, bitmap.width)
                     goldEnhanced.recycle()
                     goldEnhancedUpscaled.recycle()
@@ -1027,13 +972,9 @@ class ScreenCaptureService : Service() {
         // 注意：cutBitmap 在 recognizeTextAndHandleGesture 結束後會自動被其內部的 recycle 回收
     }
 
-    private fun last_notZero( Value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
+    private fun lastNotZero( value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
     {
-        return if (Value.lastOrNull() == '0'){
-            false
-        }else {
-            true
-        }
+        return value.lastOrNull() != '0'
     }
 
     private fun realY(inputY: Float, cropTopOffset: Float): Float {
@@ -1059,19 +1000,19 @@ class ScreenCaptureService : Service() {
         val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
         val regex6 = Regex("[蝦轄遐].[直置真百].[任住低低仟伴尫彺往仁].[獎賞]") //蝦皮直播任務獎歷
 
-        var Coin_Position_x  = 0f
-        var Coin_Position_y  = 0f
-        var Coin_Position_Top = 0f
-        var Coin_Position_Bottom = 0f
-        var Coin_Position_Height  = 0f
+        var coinPositionX  = 0f
+        var coinPositionY  = 0f
+        var coinPositionTop = 0f
+        var coinPositionBottom = 0f
+        var coinPositionHeight  = 0f
         var coinValueToRecord = 0f
         var findLiveCoinHeader = false
 
         // 紀錄上一輪是否正在等待
-        waiting_live_checker = (CoinStates == CState.WAITING_COIN || CoinStates == CState.GET_COIN_READY)
+        waitingLiveChecker = (coinStates == CState.WAITING_COIN || coinStates == CState.GET_COIN_READY)
 
         // 備份上一輪狀態，用於判定是否丟失
-        val previousState = CoinStates
+        val previousState = coinStates
         var nextState = CState.SEARCHING_COIN
 
                 try {
@@ -1095,15 +1036,15 @@ class ScreenCaptureService : Service() {
                         if (findLiveCoinHeader && headerBox != null) {
                             for (line in block.lines) {
                                 val matches1 = regex1.find(line.text)
-                                if (matches1 != null && last_notZero(matches1.value)) {
+                                if (matches1 != null && lastNotZero(matches1.value)) {
                                     val boxcRaw = line.boundingBox
                                     if (boxcRaw != null) {
                                         // 💡 因為 goldResult 是經過 UpscaleRate 倍縮放，座標需還原
                                         val boxc = android.graphics.Rect(
-                                            (boxcRaw.left / UpscaleRate).toInt(),
-                                            (boxcRaw.top / UpscaleRate).toInt(),
-                                            (boxcRaw.right / UpscaleRate).toInt(),
-                                            (boxcRaw.bottom / UpscaleRate).toInt()
+                                            (boxcRaw.left / upscaleRate).toInt(),
+                                            (boxcRaw.top / upscaleRate).toInt(),
+                                            (boxcRaw.right / upscaleRate).toInt(),
+                                            (boxcRaw.bottom / upscaleRate).toInt()
                                         )
 
                                         val currentHeader = headerBox
@@ -1113,11 +1054,11 @@ class ScreenCaptureService : Service() {
                                         if (isBelowHeader && isWithinHorizontalBounds) {
                                             Log.d("CoinValue", "第二階段：找到符合位置關係的數字 ${matches1.value}")
                                             // cropToTopRightQuarter 的 X 偏移是寬度的一半，Y 偏移是 0
-                                            Coin_Position_x = (boxc.centerX()).toFloat() + (screenshotWidth / 2f)
-                                            Coin_Position_y = realY((boxc.centerY()).toFloat(), 0f)
-                                            Coin_Position_Top = realY(boxc.top.toFloat(), 0f)
-                                            Coin_Position_Bottom = realY(boxc.bottom.toFloat(), 0f)
-                                            Coin_Position_Height = boxc.height().toFloat()
+                                            coinPositionX = (boxc.centerX()).toFloat() + (screenshotWidth / 2f)
+                                            coinPositionY = realY((boxc.centerY()).toFloat(), 0f)
+                                            coinPositionTop = realY(boxc.top.toFloat(), 0f)
+                                            coinPositionBottom = realY(boxc.bottom.toFloat(), 0f)
+                                            coinPositionHeight = boxc.height().toFloat()
 
                                             coinValueToRecord = matches1.value.toFloat()
                                             
@@ -1125,18 +1066,18 @@ class ScreenCaptureService : Service() {
                                             roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
                                             
                                             // 更新 Debug 資訊
-                                            GlobalValueHolder.debugCoinPosValue = "(${Coin_Position_x.toInt()},${Coin_Position_y.toInt()})($coinValueToRecord)"
+                                            GlobalValueHolder.debugCoinPosValue = "(${coinPositionX.toInt()},${coinPositionY.toInt()})($coinValueToRecord)"
                                             GlobalValueHolder.debugLineText = line.text
                                             GlobalValueHolder.debugLineVal = matches1.value
 
                                             // 💡 無論是否符合門檻，只要找到了就暫時標記為發現，供後續階段判斷時間
-                                            if (nextState == CState.SEARCHING_COIN || nextState == CState.PAGE_COIN_NOT_FIND) {
+                                            if (nextState == CState.SEARCHING_COIN) {
                                                 nextState = CState.COIN_VAULE_FIND
                                             }
 
                                             if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
                                                 Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
-                                                NotFindConter = 0
+                                                notFindConter = 0
                                             }
                                         }
                                     }
@@ -1149,7 +1090,7 @@ class ScreenCaptureService : Service() {
 
                     // 第三與第四階段：處理時間倒數與領取/重試按鈕 - 使用白色濾鏡
                     // 3. 處理時間倒數 (第三階段)
-                    if (nextState == CState.COIN_VAULE_FIND && Coin_Position_x != 0f) {
+                    if (nextState == CState.COIN_VAULE_FIND && coinPositionX != 0f) {
                         OuterTime@ for (block in whiteResult.textBlocks) {
                             for (line in block.lines) {
                                 val matches2 = regex2.find(line.text)
@@ -1159,7 +1100,7 @@ class ScreenCaptureService : Service() {
                                         // 💡 因為 whiteResult 是在 cutBitmap (1:1) 解析度下辨識，不需要 UpscaleRate
                                         val timey = realY(boxtRaw.top.toFloat(), 0f)
                                         // 判斷時間是否在數字下方合理的範圍內
-                                        if (timey <= Coin_Position_y + Coin_Position_Height * 3.3f) {
+                                        if (timey <= coinPositionY + coinPositionHeight * 3.3f) {
                                             Log.d("RegexMatch", "第三階段：找到倒數時間 ${matches2.value} -> WAITING_COIN")
                                             GlobalValueHolder.debugLineVal = matches2.value // 💡 紀錄找到的時間字串
                                             nextState = CState.WAITING_COIN
@@ -1180,14 +1121,14 @@ class ScreenCaptureService : Service() {
                             if (matches3 != null) {
                                 val boxg = line.boundingBox
                                 if (boxg != null) {
-                                    val GetCoin_Right_X = boxg.right.toFloat() + (screenshotWidth / 2f)
-                                    val GetCoin_Y = realY(boxg.centerY().toFloat(), 0f)
+                                    val getCoinRightX = boxg.right.toFloat() + (screenshotWidth / 2f)
+                                    val getCoinY = realY(boxg.centerY().toFloat(), 0f)
 
                                     // 如果有偵測到數字，進行精確位置校驗；如果沒偵測到數字，也執行領取（提高相容性）
-                                    val isPositionValid = if (Coin_Position_x != 0f) {
-                                        val isRightSide = GetCoin_Right_X > Coin_Position_x
-                                        val tolerance = Coin_Position_Height * 0.3f
-                                        val isWithinYRange = GetCoin_Y >= (Coin_Position_Top - tolerance) && GetCoin_Y <= (Coin_Position_Bottom + tolerance)
+                                    val isPositionValid = if (coinPositionX != 0f) {
+                                        val isRightSide = getCoinRightX > coinPositionX
+                                        val tolerance = coinPositionHeight * 0.3f
+                                        val isWithinYRange = getCoinY >= (coinPositionTop - tolerance) && getCoinY <= (coinPositionBottom + tolerance)
                                         isRightSide && isWithinYRange
                                     } else {
                                         true // 沒看到數字座標，直接信任文字辨識結果
@@ -1198,13 +1139,13 @@ class ScreenCaptureService : Service() {
                                         
                                         val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
                                         // 更新 Debug 資訊
-                                        GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${GetCoin_Y.toInt()})"
+                                        GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${getCoinY.toInt()})"
 
                                         nextState = CState.GET_COIN_READY
                                         gFindCoinButNoTime = 0
                                         floatingService?.resetFloatButtonLocation()
 
-                                        touchClick(targetClickX, GetCoin_Y)
+                                        touchClick(targetClickX, getCoinY)
 
                                         if (coinValueToRecord > 0f) {
                                             if (RecordCionLimiter.canCall()) {
@@ -1212,10 +1153,10 @@ class ScreenCaptureService : Service() {
                                                 floatingService?.updateRecordTextToday()
                                                 
                                                 // 💡 領取成功的當下，重置門檻為該時段的 UpValue
-                                                val (T_hour, T_mins) = TimeLib.GetTime()
-                                                findCurrentStrategy(T_hour, T_mins, DefaultStrategies)?.let { strategy ->
-                                                    GlobalValueHolder.coinValueSatisfy = strategy.PeriodUpValue
-                                                    Log.d("processCoinCase", "領取成功：重置門檻為 ${strategy.PeriodUpValue}")
+                                                val (tHour, tMins) = TimeLib.GetTime()
+                                                findCurrentStrategy(tHour, tMins, DefaultStrategies)?.let { strategy ->
+                                                    GlobalValueHolder.coinValueSatisfy = strategy.periodUpValue
+                                                    Log.d("processCoinCase", "領取成功：重置門檻為 ${strategy.periodUpValue}")
                                                 }
                                             }
                                         }
@@ -1229,9 +1170,9 @@ class ScreenCaptureService : Service() {
                             // 3. 處理「重試」按鈕 (第四階段)
                             val matches4 = regex4.find(line.text)
                             if (matches4 != null) {
-                                Log.d("move", "第四階段：找到重試 -> QuickRefreshPage")
+                                Log.d("move", "第四階段：找到重試 -> quickRefreshPage")
                                 serviceScope.launch {
-                                    MoveActionMutex.withLock { QuickRefreshPage() }
+                                    moveActionMutex.withLock { quickRefreshPage() }
                                 }
                                 gFindCoinButNoTime = 0
                                 nextState = CState.SEARCHING_COIN
@@ -1241,7 +1182,7 @@ class ScreenCaptureService : Service() {
                         }
                     }
 
-                    if (!isLoopBroken && nextState != CState.COIN_VAULE_FIND && nextState != CState.WAITING_COIN && nextState != CState.GET_COIN_READY) {
+                    if (!isLoopBroken && nextState != CState.COIN_VAULE_FIND && nextState != CState.WAITING_COIN) {
                         nextState = CState.PAGE_COIN_NOT_FIND
                     }
 
@@ -1250,80 +1191,80 @@ class ScreenCaptureService : Service() {
                         stateLossCounter++
                         if (stateLossCounter <= 2) {
                             Log.d("StateGuard", "WAITING_COIN 丟失，豁免中 ($stateLossCounter/2)")
-                            CoinStates = CState.WAITING_COIN // 維持狀態
+                            coinStates = CState.WAITING_COIN // 維持狀態
                         } else {
                             Log.d("StateGuard", "豁免失效，狀態降級")
-                            CoinStates = nextState
+                            coinStates = nextState
                             stateLossCounter = 0
                         }
                     } else {
-                        CoinStates = nextState
+                        coinStates = nextState
                         stateLossCounter = 0 // 只要認到東西就重置
                     }
                     // ----------------------------
-                    lastState = CoinStates // 更新全域狀態供懸浮按鈕變色使用
+                    lastState = coinStates // 更新全域狀態供懸浮按鈕變色使用
 
                     // 第五階段：處理卡bug問題與換頁邏輯
-                    if (Coin_Position_x != 0f && Coin_Position_y != 0f) {
-                        FindCoinButNoTimeHandler()
+                    if (coinPositionX != 0f && coinPositionY != 0f) {
+                        findCoinButNoTimeHandler()
                     }
 
-                    GetCoinFreezeHandler()
-                    NotFindCoinHandler()
+                    getCoinFreezeHandler()
+                    notFindCoinHandler()
                     Log.d("gIsCapturing", "IsCapturing = false")
                 } finally { }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun NotFindCoinHandler() {
-        if (CoinStates == CState.PAGE_COIN_NOT_FIND) {
-            NotFindConter += 1
+    private fun notFindCoinHandler() {
+        if (coinStates == CState.PAGE_COIN_NOT_FIND) {
+            notFindConter += 1
         }
         
-        val limit = if (waiting_live_checker) 5 else 2
+        val limit = if (waitingLiveChecker) 5 else 2
         
-        if (NotFindConter >= limit){
-            Log.d("move", "NotFindCoinHandler: 超過容忍次數 $limit -> MoveNextPage")
-            CoinStates = CState.NOT_FIND_DOING_FRESH
-            FindNextRoom()
-            NotFindConter = 0
+        if (notFindConter >= limit){
+            Log.d("move", "notFindCoinHandler: 超過容忍次數 $limit -> MoveNextPage")
+            coinStates = CState.NOT_FIND_DOING_FRESH
+            findNextRoom()
+            notFindConter = 0
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun GetCoinFreezeHandler() {
+    private fun getCoinFreezeHandler() {
 
-        if (CoinStates == CState.GET_COIN_READY) {
-            GetCoinFreezeCount += 1
-            Log.d("move", "GET_COIN_READY 累計: $GetCoinFreezeCount")
+        if (coinStates == CState.GET_COIN_READY) {
+            getCoinFreezeCount += 1
+            Log.d("move", "GET_COIN_READY 累計: $getCoinFreezeCount")
         } else {
-            GetCoinFreezeCount = 0
+            getCoinFreezeCount = 0
         }
 
-        val limit = if (waiting_live_checker) 5 else 2
+        val limit = if (waitingLiveChecker) 5 else 2
 
-        if (GetCoinFreezeCount > limit){
-            Log.d("move", "GetCoinFreezeCount 超過 $limit -> QuickRefreshPage")
+        if (getCoinFreezeCount > limit){
+            Log.d("move", "getCoinFreezeCount 超過 $limit -> quickRefreshPage")
             serviceScope.launch {
-                MoveActionMutex.withLock {
-                    QuickRefreshPage()
+                moveActionMutex.withLock {
+                    quickRefreshPage()
                 }
             }
-            GetCoinFreezeCount = 0
+            getCoinFreezeCount = 0
         }
     }
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun FindCoinButNoTimeHandler() {
+    private fun findCoinButNoTimeHandler() {
         gFindCoinButNoTime += 1 // always +1 如果找到 time code 會清 0
         Log.d("move", "FindCoinButNoTime  ===  $gFindCoinButNoTime")
         if (gFindCoinButNoTime > 3){
-            Log.d("move", "找到coin 但沒時間 Fix with QuickRefreshPage")
+            Log.d("move", "找到coin 但沒時間 Fix with quickRefreshPage")
             gFindCoinButNoTime = 0
             serviceScope.launch {
-                MoveActionMutex.withLock {
-                    QuickRefreshPage()
+                moveActionMutex.withLock {
+                    quickRefreshPage()
                 }
             }
         }
@@ -1348,7 +1289,6 @@ class ScreenCaptureService : Service() {
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
-            context = this, // activity context
             onResult = { resultText ->
                 var isFound = false
                 try {
@@ -1396,15 +1336,15 @@ class ScreenCaptureService : Service() {
                 finally {
                     cut_image.recycle()
                     if (isFound) {
-                        checkLiveStreamingPage_retry_count = 0
-                        notInLiveStreamingPage_reopen_request = false
+                        checkLiveStreamingPageRetryCount = 0
+                        notInLiveStreamingPageReopenRequest = false
                     } else {
-                        checkLiveStreamingPage_retry_count += 1
-                        Log.d("checkInLiveStreamingPage", "直播頁面 沒找到 retry = $checkLiveStreamingPage_retry_count ")
+                        checkLiveStreamingPageRetryCount += 1
+                        Log.d("checkInLiveStreamingPage", "直播頁面 沒找到 retry = $checkLiveStreamingPageRetryCount ")
                     }
-                    if (checkLiveStreamingPage_retry_count > 5) {
-                        checkLiveStreamingPage_retry_count = 0
-                        notInLiveStreamingPage_reopen_request = true
+                    if (checkLiveStreamingPageRetryCount > 5) {
+                        checkLiveStreamingPageRetryCount = 0
+                        notInLiveStreamingPageReopenRequest = true
                     }
                 }
             },
@@ -1415,16 +1355,15 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun UpdatePositionForFullFreshPage(snap_image: Bitmap) {
-        Full_refresh_Position_x = 0f
-        Full_refresh_Position_y = 0f
+    private fun updatePositionForFullFreshPage(snap_image: Bitmap) {
+        fullRefreshPositionX = 0f
+        fullRefreshPositionY = 0f
         val cut_image = BitmapCropLib.cropToVerticalTop20percent(snap_image)
 
         val regex = Regex("[短程].{1}[音言].*?[直置真].{1}")
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
-            context = this, // activity context
             onResult = { resultText ->
                 try {
                     OutHere@ for (block in resultText.textBlocks) {
@@ -1437,19 +1376,19 @@ class ScreenCaptureService : Service() {
                                 Log.d("OCR_Line", "位置：${line.boundingBox}")
                                 val boxc = line.boundingBox
                                 if (boxc != null) {
-                                    Full_refresh_Position_x = metrics.widthPixels / 2f + boxc.width().toFloat()/7.8f  // hard code, metrics.widthPixels / 2f
-                                    Full_refresh_Position_y = (boxc.centerY()).toFloat()
+                                    fullRefreshPositionX = metrics.widthPixels / 2f + boxc.width().toFloat()/7.8f  // hard code, metrics.widthPixels / 2f
+                                    fullRefreshPositionY = (boxc.centerY()).toFloat()
 
-                                    if (Full_refresh_Position_y >= (metrics.heightPixels) / 5f  || Full_refresh_Position_x > (0.75f) * (metrics.widthPixels)){
+                                    if (fullRefreshPositionY >= (metrics.heightPixels) / 5f  || fullRefreshPositionX > (0.75f) * (metrics.widthPixels)){
                                         //
-                                        // 如果 Full_refresh_Position_y 值有問題(大於五分之一個螢幕Y軸) retry
+                                        // 如果 fullRefreshPositionY 值有問題(大於五分之一個螢幕Y軸) retry
                                         //
-                                        Full_refresh_Position_x = 0f
-                                        Full_refresh_Position_y = 0f
+                                        fullRefreshPositionX = 0f
+                                        fullRefreshPositionY = 0f
                                         Log.d("RegexMatch直播", "Full_refresh_Position 位置不對")
                                     }
 
-                                    Log.d("RegexMatch直播", "Full_refresh_Position_x：${Full_refresh_Position_x}, Full_refresh_Position_y：${Full_refresh_Position_y}, w: ${boxc.width()}")
+                                    Log.d("RegexMatch直播", "fullRefreshPositionX：${fullRefreshPositionX}, fullRefreshPositionY：${fullRefreshPositionY}, w: ${boxc.width()}")
                                     break@OutHere
                                 }
                             }
@@ -1476,13 +1415,12 @@ class ScreenCaptureService : Service() {
         }
 
         val image = imageReader?.acquireLatestImage()
-        var bitmap: Bitmap? = null
         if(image == null){
             findShopeeMainPage = true
             delay(25000L)
             return
         }
-        bitmap = getBitmapFromImage(image)
+        val bitmap = getBitmapFromImage(image)
 
         val cut_image = BitmapCropLib.cropToVerticalButton25percent(bitmap)
         bitmap.recycle()
@@ -1492,7 +1430,6 @@ class ScreenCaptureService : Service() {
 
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = cut_image,
-            context = this, // activity context
             onResult = { resultText ->
                 try {
                     findShopeeMainPage = false
@@ -1508,8 +1445,8 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/2f)  + 50f) && boxc.right > ((metrics.widthPixels/2f)  - 50f)) {
                                         Log.d("FindShopeeMainPage", "找到 直播短影音 in low 25% page  location right")
-                                        // cropToVerticalButton25percent 的 Y 偏移是高度的 0.75
-                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
+                                        // cropToVerticalButton25percent 的 Y 偏移是高度의 0.75
+                                        mainPageStreamLiveEntryY = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }
@@ -1523,8 +1460,8 @@ class ScreenCaptureService : Service() {
                                 if (boxc != null) {
                                     if (boxc.left < ((metrics.widthPixels/3f) )) {
                                         Log.d("FindShopeeMainPage", "找到 蝦拼 in low 25% page  location right")
-                                        // cropToVerticalButton25percent 的 Y 偏移是高度的 0.75
-                                        mainPageStreamLiveEntry_y = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
+                                        // cropToVerticalButton25percent 的 Y 偏移是高度의 0.75
+                                        mainPageStreamLiveEntryY = realY(boxc.centerY().toFloat(), metrics.heightPixels * 0.75f)
                                         findShopeeMainPage = true
                                         break@OutHere
                                     }
@@ -1549,12 +1486,10 @@ class ScreenCaptureService : Service() {
 
     private suspend fun recognizeTextAndHandleGesture(
         bitmap: Bitmap,
-        context: Context,
         textAndGestureHandler:  (Text) -> Unit
     ): String = suspendCancellableCoroutine { cont ->
         TextRecognizerUtil.recognizeTextFromImage(
             bitmap = bitmap,
-            context = context,
             onResult = { resultText ->
                 try {
                     textAndGestureHandler(resultText)
@@ -1574,23 +1509,23 @@ class ScreenCaptureService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun FindNextRoom() {
+    private fun findNextRoom() {
         moveNextPage()
     }
 
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun FullFreshPage() {
+    private suspend fun fullFreshPage() {
 
         // 💡 Full Refresh 後順序會亂掉，必須清空歷史
         roomHistoryMap.clear()
         currentRoomIndex = 0
 
-        if (Full_refresh_Position_x != 0f && Full_refresh_Position_y != 0f) {
+        if (fullRefreshPositionX != 0f && fullRefreshPositionY != 0f) {
             delay(200L)
-            touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
+            touchClick(fullRefreshPositionX, fullRefreshPositionY)
             delay(500L)
-            touchClick(Full_refresh_Position_x, Full_refresh_Position_y)
+            touchClick(fullRefreshPositionX, fullRefreshPositionY)
             delay(1000L)
             moveNextPage()
             delay(300L)
@@ -1599,26 +1534,18 @@ class ScreenCaptureService : Service() {
 
     }
 
-    private fun PlatformBackGesture () {
+    private fun platformBackGesture () {
         MyAccessibilityService.performBack()
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun GetCoinAndQuickRefreshPage () {
-        delay(100L)
-        PlatformBackGesture()
-        delay(1500L)
-        QuickRefreshPage()
-        delay(100L)
+    private fun touchClick(x: Float, y: Float) {
+        val acService = MyAccessibilityService.instance
+        acService?.click(x, y, randomized = true)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun GetCoinButton (x:Float, y:Float) {
-        touchClick(x, y)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.N)
-    private suspend fun QuickRefreshPage () {
+    private suspend fun quickRefreshPage () {
         delay(30L)
         moveNextPage()
         delay(1600L)
@@ -1633,9 +1560,9 @@ class ScreenCaptureService : Service() {
         
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / GlobalValueHolder.prevMoveFactor
-        Log.d("MovePreviousPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchUpDown(screenCenterX,screenCenterY - MoveDistance, screenCenterY + MoveDistance, GlobalValueHolder.prevMoveLong)
+        val moveDistance  = metrics.heightPixels / GlobalValueHolder.prevMoveFactor
+        Log.d("MovePreviousPage", "screenCenterY ：$screenCenterY, moveDistance ：$moveDistance")
+        touchUpDown(screenCenterX,screenCenterY - moveDistance, screenCenterY + moveDistance, GlobalValueHolder.prevMoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -1644,18 +1571,18 @@ class ScreenCaptureService : Service() {
 
         val screenCenterX = metrics.widthPixels / 2f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.heightPixels / GlobalValueHolder.nextMoveFactor
-        Log.d("MoveNextPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchUpDown(screenCenterX,screenCenterY + MoveDistance, screenCenterY - MoveDistance, GlobalValueHolder.nextMoveLong)
+        val moveDistance  = metrics.heightPixels / GlobalValueHolder.nextMoveFactor
+        Log.d("MoveNextPage", "screenCenterY ：$screenCenterY, moveDistance ：$moveDistance")
+        touchUpDown(screenCenterX,screenCenterY + moveDistance, screenCenterY - moveDistance, GlobalValueHolder.nextMoveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
     private fun moveLeftPage () {
         val screenX = metrics.widthPixels / 4f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.widthPixels / 1.5f
-        Log.d("moveLeftPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchRightLeft(screenX,screenX + MoveDistance, screenCenterY, 700)
+        val moveDistance  = metrics.widthPixels / 1.5f
+        Log.d("moveLeftPage", "screenCenterY ：$screenCenterY, moveDistance ：$moveDistance")
+        touchRightLeft(screenX,screenX + moveDistance, screenCenterY, 700)
     }
 
 
@@ -1663,29 +1590,21 @@ class ScreenCaptureService : Service() {
     private fun moveRightPage () {
         val screenX = metrics.widthPixels / 4f
         val screenCenterY = metrics.heightPixels / 2f
-        val MoveDistance  = metrics.widthPixels / 1.5f
-        Log.d("moveRightPage", "screenCenterY ：${screenCenterY}, MoveDistance ：${MoveDistance}")
-        touchRightLeft(screenX + MoveDistance, screenX , screenCenterY, 700)
+        val moveDistance  = metrics.widthPixels / 1.5f
+        Log.d("moveRightPage", "screenCenterY ：$screenCenterY, moveDistance ：$moveDistance")
+        touchRightLeft(screenX + moveDistance, screenX , screenCenterY, 700)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun touchUpDown (X: Float, Y_S: Float, Y_E: Float, MoveLong: Long) {
-        val ACservice = MyAccessibilityService.instance
-        //ACservice?.swipe(X, Y_S , X, Y_E, MoveLong)
-        ACservice?.swipeBezier(X, Y_S , X, Y_E, MoveLong)
+    private fun touchUpDown (x: Float, yStart: Float, yEnd: Float, moveLong: Long) {
+        val acService = MyAccessibilityService.instance
+        acService?.swipeBezier(x, yStart , x, yEnd, moveLong)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun touchRightLeft (X_S: Float, X_E: Float, Y: Float, MoveLong: Long) {
-        val ACservice = MyAccessibilityService.instance
-        //ACservice?.swipe(X_S, Y , X_E, Y, MoveLong)
-        ACservice?.swipeBezier(X_S, Y , X_E, Y, MoveLong)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.N)
-    private fun touchClick (X: Float, Y: Float) {
-        val ACservice = MyAccessibilityService.instance
-        ACservice?.click(X, Y, randomized = true)
+    private fun touchRightLeft (xStart: Float, xEnd: Float, y: Float, moveLong: Long) {
+        val acService = MyAccessibilityService.instance
+        acService?.swipeBezier(xStart, y , xEnd, y, moveLong)
     }
 
     private fun cleanup() {
@@ -1702,6 +1621,7 @@ class ScreenCaptureService : Service() {
 
     private fun isNowInTimeRangeCheck(): Boolean {
         val now = Calendar.getInstance()
+        now.timeInMillis = System.currentTimeMillis()
         val nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
         val startMinutes = GlobalValueHolder.StartHour * 60 + GlobalValueHolder.StartMinute
         val endMinutes = GlobalValueHolder.EndHour * 60 + GlobalValueHolder.EndMinute
@@ -1745,7 +1665,6 @@ class ScreenCaptureService : Service() {
         mediaProjection?.stop()
         virtualDisplay?.release()
         imageReader?.close()
-        mediaProjection?.stop()
         stopSelf()
         Log.d("ScreenCaptureService", "App 被滑掉，服務停止")
     }
@@ -1763,7 +1682,6 @@ class ScreenCaptureService : Service() {
         mediaProjection?.stop()
         virtualDisplay?.release()
         imageReader?.close()
-        mediaProjection?.stop()
 
         isRunning = false
     }

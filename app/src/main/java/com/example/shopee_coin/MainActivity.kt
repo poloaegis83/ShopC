@@ -1,7 +1,5 @@
 package com.example.shopee_coin
 
-// 新增 import
-
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -11,14 +9,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.util.Log
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -62,6 +58,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -86,7 +85,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.window.layout.WindowMetricsCalculator
 import com.example.shopee_coin.ui.theme.Shopee_coinTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -94,9 +92,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.min
 
-//var isOn: Boolean = false
-
-class MainActivity<ClaimRecord> : ComponentActivity() {
+class MainActivity : ComponentActivity() {
 
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>  // 懸浮視窗的權限
     private lateinit var storagePermissionLauncher: ActivityResultLauncher<Array<String>> // 儲存空間權限
@@ -117,7 +113,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     }
 
     private fun loadSwipeSettings() {
-        val prefs = getSharedPreferences("SwipeSettings", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("SwipeSettings", MODE_PRIVATE)
         GlobalValueHolder.nextMoveFactor = prefs.getFloat("nextMoveFactor", GlobalValueHolder.DEFAULT_NEXT_FACTOR)
         GlobalValueHolder.nextMoveLong = prefs.getLong("nextMoveLong", GlobalValueHolder.DEFAULT_NEXT_LONG)
         GlobalValueHolder.prevMoveFactor = prefs.getFloat("prevMoveFactor", GlobalValueHolder.DEFAULT_PREV_FACTOR)
@@ -125,7 +121,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     }
 
     private fun saveSwipeSettings() {
-        val prefs = getSharedPreferences("SwipeSettings", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("SwipeSettings", MODE_PRIVATE)
         prefs.edit().apply {
             putFloat("nextMoveFactor", GlobalValueHolder.nextMoveFactor)
             putLong("nextMoveLong", GlobalValueHolder.nextMoveLong)
@@ -135,15 +131,11 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
     }
 
-    //@RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         loadSwipeSettings()
 
-        //
-        // 懸浮視窗的權限 Start
-        //
-        overlayPermissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        overlayPermissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (Settings.canDrawOverlays(this)) {
                 recreate()
             } else {
@@ -158,13 +150,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             overlayPermissionLauncher.launch(intent)
             return
         } else {
-            startService(Intent(this, FloatingButtonService::class.java)) // 加這行
+            startService(Intent(this, FloatingButtonService::class.java))
         }
-        //
-        // 懸浮視窗的權限 End
-        //
 
-        //  儲存空間權限初始化
         storagePermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val granted = permissions.entries.all { it.value }
             if (!granted) {
@@ -173,15 +161,10 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
         checkAndRequestStoragePermissions()
 
-        // 💡 檢查無障礙服務狀態：包含「未開啟」以及「已開啟但沒在跑（異常）」
         val isEnabled = isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
-        val isRunning = MyAccessibilityService.isRunning
-        if (!isEnabled || !isRunning) {
+        if (!isEnabled || !MyAccessibilityService.isRunning) {
             showAccessibilityDialog = true
         }
-
-        // MediaProjection 的權限 in 另一個 activity
-        //startActivity(Intent(this, ScreenCapturePermissionActivity::class.java))
 
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val (realWidth, realHeight) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -190,15 +173,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             bounds.width() to bounds.height()
         } else {
             val displayMetrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
             windowManager.defaultDisplay.getRealMetrics(displayMetrics)
             displayMetrics.widthPixels to displayMetrics.heightPixels
         }
 
         gTotalWidth = realWidth.toFloat()
         gTotalHeight = realHeight.toFloat()
-        gHeightOffset = 0f // 既然採用全螢幕擷取，不再需要補償偏移
+        gHeightOffset = 0f
 
-        Log.d("ScreenSize", "實體解析度: ${realWidth}x${realHeight}")
+        Log.d("ScreenSize", "實體解析度: ${realWidth}x$realHeight")
 
         coinStorage = CoinClaimStorage(this)
 
@@ -206,23 +190,18 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         setContent {
             Shopee_coinTheme {
-                Scaffold(modifier = Modifier.fillMaxSize(),
-                        //containerColor = Color.White  // 白底
-                ) { innerPadding ->
-                    // **新增開始**
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     LimitFontScale(maxScale = 1.2f) {
                         Column(modifier = Modifier.padding(innerPadding)) {
                             Greeting(
                                 name = "蝦霸-蝦幣工具",
-                                modifier = Modifier
-                                .scale(0.8f)
+                                modifier = Modifier.scale(0.8f)
                             )
 
                             if (showAccessibilityDialog) {
-                                val isEnabled = isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
-                                val isRunning = MyAccessibilityService.isRunning
+                                val isEnabledAc = isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
                                 
-                                val dialogText = if (!isEnabled) {
+                                val dialogText = if (!isEnabledAc) {
                                     "需要「無障礙服務」權限才能執行點擊與滑動。請在設定中找到「蝦霸」並開啟服務。"
                                 } else {
                                     "無障礙服務目前處於「異常狀態」（已開啟但未正常運作）。這通常是 Android 系統的問題，請到設定中將「蝦霸」服務「關掉再重新打開」即可修復。"
@@ -230,7 +209,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
                                 AlertDialog(
                                     onDismissRequest = { showAccessibilityDialog = false },
-                                    title = { Text(if (!isEnabled) "需要無障礙服務權限" else "無障礙服務狀態異常") },
+                                    title = { Text(if (!isEnabledAc) "需要無障礙服務權限" else "無障礙服務狀態異常") },
                                     text = { Text(dialogText) },
                                     confirmButton = {
                                         TextButton(onClick = {
@@ -250,12 +229,12 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         }
                         SetPageItems()
                     }
-                }// end of Scaffold
-            } // end of Shopee_coinTheme
+                }
+            }
 
             KeepScreenOn()
             DoubleBackToExitApp()
-        }  // end of setContent
+        }
 
     }
 
@@ -265,15 +244,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         var showSwipeTuningDialog by remember { mutableStateOf(false) }
 
-        //var isLowEndDevice by remember { mutableStateOf(GlobalValueHolder.IsLowEndDevice) }
-        //var appCheckRestartFeature by remember { mutableStateOf(GlobalValueHolder.appCheckRestartFeature) }
-        //var notInTimeBcckToHere by remember { mutableStateOf(GlobalValueHolder.notInTimeBcckToHere) }
-        //var isTimeLimit by remember { mutableStateOf(GlobalValueHolder.IsTimeLimit) }
-        //var advanceSetting by remember { mutableStateOf(false) }
-
         val configuration = LocalConfiguration.current
         val screenWidth = configuration.screenWidthDp.dp
-        val componentWidth = screenWidth * 0.6f  // 元件寬度 = 螢幕的 85%
+        val componentWidth = screenWidth * 0.6f
 
         var text2 by remember { mutableStateOf("") }
 
@@ -282,22 +255,21 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         ) {
             HorizontalDivider(
                 modifier = Modifier
-                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 5.dp), // 上下間距
-                thickness = 2.dp,        // 線的粗細
-                color = Color.Gray     // 線的顏色
+                    .fillMaxWidth()
+                    .padding(vertical = 5.dp),
+                thickness = 2.dp,
+                color = Color.Gray
             )
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 5.dp, end = 8.dp),  // 整個 Row 的頂部和右邊距離
+                    .padding(top = 5.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ){
                 Button(
                     onClick = { startShopCoinService() },
-                    shape = RoundedCornerShape(12.dp),      // 圓角
-                    //border = BorderStroke(5.dp, Color.LightGray), // 外框顏色
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .width(componentWidth)
                         .height(55.dp)
@@ -315,14 +287,11 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
-                        .padding(5.dp) // 外框厚度
+                        .padding(5.dp)
                 ) {
-                    Text("按此開始 蝦幣偵測",
-                        fontSize = 16.sp // 字體大小
-                    )
+                    Text("按此開始 蝦幣偵測", fontSize = 16.sp)
                 }
 
-                // 間隔
                 Spacer(modifier = Modifier.width(8.dp))
 
                 CloseAppButton()
@@ -352,8 +321,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         GlobalValueHolder.StartHour = hourOfDay
                         GlobalValueHolder.StartMinute = minute
                     },
-                    calendar.get(Calendar.HOUR_OF_DAY),
-                    calendar.get(Calendar.MINUTE),
+                    calendar[Calendar.HOUR_OF_DAY],
+                    calendar[Calendar.MINUTE],
                     true
                 )
             }
@@ -366,8 +335,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         GlobalValueHolder.EndHour = hourOfDay
                         GlobalValueHolder.EndMinute = minute
                     },
-                    calendar.get(Calendar.HOUR_OF_DAY),
-                    calendar.get(Calendar.MINUTE),
+                    calendar[Calendar.HOUR_OF_DAY],
+                    calendar[Calendar.MINUTE],
                     true
                 )
             }
@@ -385,13 +354,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     Checkbox(
                         checked = GlobalValueHolder.IsTimeLimit,
                         onCheckedChange = { checked ->
-                            //isTimeLimit = checked
                             GlobalValueHolder.IsTimeLimit = checked
-                        },
-                        //colors = CheckboxDefaults.colors(
-                        //    checkedColor = Color.Black,
-                        //    uncheckedColor = Color.Black
-                        //)
+                        }
                     )
                 }
 
@@ -410,7 +374,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         onCheckedChange = { checked ->
                             GlobalValueHolder.advanceSetting = checked
                             if (!checked) {
-                                // 進階選項取消勾選時，重置內部狀態
                                 text2 = ""
                                 GlobalValueHolder.IsLowEndDevice = false
                                 GlobalValueHolder.appCheckRestartFeature = false
@@ -436,7 +399,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         Text("開始時間：$selectedTimeStart")
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp)) // 兩個欄之間的間距
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Button(onClick = { timePickerDialogEnd.show() }) {
@@ -449,18 +412,18 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             }
             HorizontalDivider(
                 modifier = Modifier
-                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 6.dp), // 上下間距
-                thickness = 2.dp,        // 線的粗細
-                color = Color.Gray     // 線的顏色
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                thickness = 2.dp,
+                color = Color.Gray
             )
             CoinStatsScreen(coinStorage, GlobalValueHolder.advanceSetting)
             HorizontalDivider(
                 modifier = Modifier
-                    .fillMaxWidth()      // 線的寬度（可改成固定寬度）
-                    .padding(vertical = 6.dp), // 上下間距
-                thickness = 2.dp,        // 線的粗細
-                color = Color.Gray     // 線的顏色
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                thickness = 2.dp,
+                color = Color.Gray
             )
 
             AccessibilityStatusScreen()
@@ -479,19 +442,12 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         Checkbox(
                             checked = GlobalValueHolder.IsLowEndDevice ,
                             onCheckedChange = { checked ->
-                                //isLowEndDevice = checked
                                 GlobalValueHolder.IsLowEndDevice = checked
-                            },
-                            //colors = CheckboxDefaults.colors(
-                            //    checkedColor = Color.Black,
-                            //    uncheckedColor = Color.Black
-                            //)
+                            }
                         )
                     }
                     Spacer(modifier = Modifier.width(1.dp))
-                    Text(text = "Low-End Device(低階裝置用)",
-                        fontSize = 12.sp // 自訂字體大小
-                    )
+                    Text(text = "Low-End Device(低階裝置用)", fontSize = 12.sp)
                     Spacer(modifier = Modifier.width(3.dp))
                     Box(
                         modifier = Modifier
@@ -502,22 +458,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         Checkbox(
                             checked = GlobalValueHolder.appCheckRestartFeature,
                             onCheckedChange = { checked ->
-                                //appCheckRestartFeature = checked
                                 GlobalValueHolder.appCheckRestartFeature = checked
                                 if (!checked) {
                                     GlobalValueHolder.notInTimeBcckToHere = false
                                 }
-                            },
-                            //colors = CheckboxDefaults.colors(
-                            //    checkedColor = Color.Black,
-                            //    uncheckedColor = Color.Black
-                            //)
+                            }
                         )
                     }
                     Spacer(modifier = Modifier.width(1.dp))
-                    Text(text = "自動重啟蝦皮",
-                        fontSize = 12.sp // 自訂字體大小
-                    )
+                    Text(text = "自動重啟蝦皮", fontSize = 12.sp)
 
                 }
                 Row(
@@ -538,11 +487,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         )
                     }
                     Spacer(modifier = Modifier.width(1.dp))
-                    Text(text = "舊蝦模式",
-                        fontSize = 12.sp
-                    )
+                    Text(text = "舊蝦模式", fontSize = 12.sp)
                     
-                    // 將 Debug 訊息移動到舊蝦模式之後
                     if (GlobalValueHolder.advanceSetting) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
@@ -595,23 +541,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         Checkbox(
                             checked = GlobalValueHolder.notInTimeBcckToHere,
                             onCheckedChange = { checked ->
-                                //notInTimeBcckToHere = checked
                                 GlobalValueHolder.notInTimeBcckToHere = checked
-                            },
-                            //colors = CheckboxDefaults.colors(
-                            //    checkedColor = Color.Black,
-                            //    uncheckedColor = Color.Black
-                            //)
+                            }
                         )
                     }
                     Spacer(modifier = Modifier.width(3.dp))
-                    Text(text = "排程時段外，返回此APP等",
-                        fontSize = 11.sp // 自訂字體大小
-                    )
+                    Text(text = "排程時段外，返回此APP等", fontSize = 11.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { 
-                            // 💡 確保無障礙服務已啟動再進行測試，否則滑動會沒反應
                             if (isEnabledAcService && MyAccessibilityService.isRunning) {
                                 if (!isServiceRunning(ScreenCaptureService::class.java)) {
                                     val intent = Intent(this@MainActivity, ScreenCaptureService::class.java)
@@ -641,37 +579,27 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         .fillMaxWidth()
                         .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp) // 元件之間間距
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TextField(
                         value = text2,
                         onValueChange = { newValue ->
-                            // 只允許數字與最多一個小數點
                             if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
                                 text2 = newValue
                             }
                         },
-                        label = {
-                            Text(
-                                "自訂底線值",
-                                fontSize = 11.sp // 標籤字體大小
-                            )
-                        },
+                        label = { Text("自訂底線值", fontSize = 11.sp) },
                         singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp),
+                        textStyle = TextStyle(fontSize = 11.sp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.width(160.dp)
                     )
                     Button(
-                        onClick = { SetDownValue(text2.toFloatOrNull() ?: 0f) }
+                        onClick = { setDownValue(text2.toFloatOrNull() ?: 0f) }
                     ) {
-                        Text("自訂底線值",
-                            fontSize = 11.sp // 自訂字體大小
-                        )
+                        Text("自訂底線值", fontSize = 11.sp)
                     }
-                    Text("自訂值：$text2",
-                        fontSize = 11.sp
-                    )
+                    Text("自訂值：$text2", fontSize = 11.sp)
                 }
             }
 
@@ -686,7 +614,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     @Composable
     fun KeepScreenOn() {
         val context = LocalContext.current
-        val keepOn = GlobalValueHolder.notInTimeBcckToHere   // 直接讀 state
+        val keepOn = GlobalValueHolder.notInTimeBcckToHere
 
         DisposableEffect(keepOn) {
             val activity = context as Activity
@@ -701,39 +629,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     @Composable
     fun ImageForMe() {
-        // 20張圖的 ID
         val images = listOf(
-            R.drawable.money1,
-            R.drawable.money2,
-            R.drawable.money3,
-            R.drawable.money4,
-            R.drawable.money5,
-            R.drawable.money6,
-            R.drawable.money7,
-            R.drawable.money8,
-            R.drawable.money9,
-            R.drawable.money10,
-            R.drawable.money11,
-            R.drawable.money12,
-            R.drawable.money13,
-            R.drawable.money14,
-            R.drawable.money15,
-            R.drawable.money16,
-            R.drawable.money17,
-            R.drawable.money18,
-            R.drawable.money19,
-            R.drawable.money20,
-            R.drawable.money21,
-            R.drawable.money22,
-            R.drawable.money23,
-            R.drawable.money24,
-            R.drawable.money25
+            R.drawable.money1, R.drawable.money2, R.drawable.money3, R.drawable.money4, R.drawable.money5,
+            R.drawable.money6, R.drawable.money7, R.drawable.money8, R.drawable.money9, R.drawable.money10,
+            R.drawable.money11, R.drawable.money12, R.drawable.money13, R.drawable.money14, R.drawable.money15,
+            R.drawable.money16, R.drawable.money17, R.drawable.money18, R.drawable.money19, R.drawable.money20,
+            R.drawable.money21, R.drawable.money22, R.drawable.money23, R.drawable.money24, R.drawable.money25
         )
 
-        // 狀態：剩餘可用圖片池
         var remainingImages by remember { mutableStateOf(images.shuffled()) }
-        // 狀態：當前圖片
-        var currentImage by remember { mutableStateOf(remainingImages.first()) }
+        var currentImage by remember { mutableIntStateOf(remainingImages.first()) }
 
         Box(
             modifier = Modifier.fillMaxSize()
@@ -746,15 +651,10 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     .padding(3.dp)
                     .size(190.dp)
                     .clickable {
-                        // 從剩餘池移除當前圖片
                         remainingImages = remainingImages.drop(1)
-
-                        // 如果剩餘圖片空了 → 重置並重新洗牌
                         if (remainingImages.isEmpty()) {
                             remainingImages = images.shuffled()
                         }
-
-                        // 更新當前圖片
                         currentImage = remainingImages.first()
                     }
             )
@@ -767,36 +667,23 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         Button(onClick = {
             val activity = context as? Activity
-
-            // 如果服務正在執行，先停止
             if (ScreenCaptureService.isRunning) {
                 val svcIntent = Intent(context, ScreenCaptureService::class.java)
                 context.stopService(svcIntent)
             }
-
-            // 關閉所有 Activity
             activity?.finishAffinity()
-
-            // 如果確定要殺進程（不建議）
-            // kotlin.system.exitProcess(0)
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.DarkGray,
                 contentColor = Color.White
             ),
-            shape = RoundedCornerShape(5.dp),      // 圓角
+            shape = RoundedCornerShape(5.dp),
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 1.dp),
             modifier = Modifier.padding(start = 5.dp)
         ) {
-            Text(
-                "關閉 App",
-                fontSize = 12.sp
-            )
+            Text("關閉 App", fontSize = 12.sp)
             Spacer(modifier = Modifier.width(1.dp))
-            Text(
-                "⛔", // 停止符號 Emoji
-                fontSize = 14.sp
-            )
+            Text("⛔", fontSize = 14.sp)
         }
     }
 
@@ -812,16 +699,13 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     @Composable
     fun CoinStatsScreen(storage: CoinClaimStorage, advanceSetting: Boolean) {
-        // —— 今日統計狀態 —— //
-        var todayCount by remember { mutableStateOf(0) }
-        var todayAverage by remember { mutableStateOf(0.0) }
-        var averageInterval by remember { mutableStateOf(0L) }
-        var todayTotal by remember { mutableStateOf(0.0) }
+        var todayCount by remember { mutableIntStateOf(0) }
+        var todayAverage by remember { mutableDoubleStateOf(0.0) }
+        var averageInterval by remember { mutableLongStateOf(0L) }
+        var todayTotal by remember { mutableDoubleStateOf(0.0) }
         var todayClaims by remember { mutableStateOf<List<CoinClaim>>(emptyList()) }
 
-        // —— 過去七天（不含今日） —— //
         var pastSevenDaily by remember { mutableStateOf<List<Triple<String, Double, Int>>>(emptyList()) }
-        var pastSevenTotal by remember { mutableStateOf(0.0) }
 
         var showDialog by remember { mutableStateOf(false) }
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -831,7 +715,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 if (event == Lifecycle.Event.ON_RESUME) {
                     val allClaims: List<CoinClaim> = storage.getClaims()
 
-                    // 今天 00:00
                     val base = Calendar.getInstance().apply {
                         set(Calendar.HOUR_OF_DAY, 0)
                         set(Calendar.MINUTE, 0)
@@ -840,19 +723,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     }
                     val todayStart = base.timeInMillis
 
-                    // 7 天前 00:00（不含今日）
                     val periodStart = (base.clone() as Calendar).apply {
                         add(Calendar.DAY_OF_MONTH, -7)
                     }.timeInMillis
 
-                    // 僅保留最後 8 天（今天 + 前 7 天）
                     val recentClaims: List<CoinClaim> =
                         allClaims.filter { it.timestamp >= periodStart }
                     storage.saveClaims(recentClaims)
 
-                    // —— 今日統計 —— //
                     val today = recentClaims.filter { it.timestamp >= todayStart }
-                    todayClaims = today   // 把今天的紀錄放進 state
+                    todayClaims = today
 
                     todayCount = today.size
                     todayTotal = today.sumOf { it.amount }
@@ -864,10 +744,8 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         intervals.sum() / intervals.size
                     } else 0L
 
-                    // —— 過去七天（不含今日）每日總合 + 次數 —— //
-                    val fmt = java.text.SimpleDateFormat("MM/dd", java.util.Locale.getDefault())
+                    val fmt = SimpleDateFormat("MM/dd", Locale.getDefault())
                     val pastList = mutableListOf<Triple<String, Double, Int>>()
-                    var sevenSum = 0.0
 
                     for (i in 1..7) {
                         val dayCal = (base.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -i) }
@@ -876,15 +754,13 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
                         val dayClaims = recentClaims.filter { it.timestamp in dayStart until dayEnd }
                         val dayTotal = dayClaims.sumOf { it.amount }
-                        val dayCount = dayClaims.size.coerceAtMost(100) // 次數上限 100
+                        val dayCount = dayClaims.size.coerceAtMost(100)
 
-                        val label = fmt.format(java.util.Date(dayStart))
+                        val label = fmt.format(Date(dayStart))
                         pastList += Triple(label, dayTotal, dayCount)
-                        sevenSum += dayTotal
                     }
 
                     pastSevenDaily = pastList
-                    pastSevenTotal = sevenSum
                 }
             }
 
@@ -892,9 +768,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
         }
 
-        // —— UI —— //
         Column(modifier = Modifier.padding(8.dp)) {
-            // 今日統計
             Text(
                 text = "今天領取：$todayCount 次，均：${"%.2f".format(todayAverage)}，合：${"%.2f".format(todayTotal)}",
                 fontSize = 13.sp,
@@ -920,10 +794,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 modifier = Modifier.padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ){
-                // 查看過去七天（不含今日）
                 Button(onClick = { showDialog = true },
                     contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(10.dp),      // 圓角
+                    shape = RoundedCornerShape(10.dp),
                 )
                 {
                     Text("查看近七天紀錄", fontSize = 11.sp)
@@ -931,7 +804,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 Spacer(modifier = Modifier.width(12.dp))
                 Button(onClick = { showDetailDialog = true },
                     contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(10.dp),      // 圓角
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("查看今日明細", fontSize = 11.sp)
                 }
@@ -941,23 +814,22 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             TodayClaimDetailDialog(
                 showDialog = showDetailDialog,
                 onDismiss = { showDetailDialog = false },
-                todayClaims = todayClaims // 這裡你傳入 List<Triple<序號, coin數值, 時間戳ms>>
+                todayClaims = todayClaims
             )
 
             if (showDialog) {
                 var confirmDelete by remember { mutableStateOf(false) }
-                androidx.compose.material3.AlertDialog(
+                AlertDialog(
                     onDismissRequest = { showDialog = false },
                     title = { Text("今日+過去七天 自動領取紀錄", fontSize = 14.sp) },
                     text = {
                         Column {
-                            // 今日
                             Text(
-                                "今日 : ${"%.2f".format(todayTotal)}，次數：${todayCount}",
+                                "今日 : ${"%.2f".format(todayTotal)}，次數：$todayCount",
                                 fontSize = 12.sp
                             )
 
-                            androidx.compose.material3.HorizontalDivider(
+                            HorizontalDivider(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp),
@@ -965,11 +837,9 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 color = Color.Gray
                             )
 
-                            val pastSevenTotal = pastSevenDaily.sumOf { it.second }  // 總額
-                            val pastSevenTotalCount = pastSevenDaily.sumOf { it.third }  // 總次數
+                            val pastSevenTotalSum = pastSevenDaily.sumOf { it.second }
+                            val pastSevenTotalCount = pastSevenDaily.sumOf { it.third }
 
-
-                            // 過去七天
                             if (pastSevenDaily.isEmpty()) {
                                 Text("無資料")
                             } else {
@@ -981,10 +851,10 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 }
 
                                 Spacer(modifier = Modifier.height(6.dp))
-                                androidx.compose.material3.HorizontalDivider()
+                                HorizontalDivider()
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    "過去七天(不含今日) : ${"%.2f".format(pastSevenTotal)}, 總次數：$pastSevenTotalCount",
+                                    "過去七天(不含今日) : ${"%.2f".format(pastSevenTotalSum)}, 總次數：$pastSevenTotalCount",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
                                 )
@@ -1026,21 +896,16 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 }
                             } else {
                                 TextButton(onClick = {
-                                    // 重置今日統計
                                     todayCount = 0
                                     todayTotal = 0.0
                                     todayAverage = 0.0
                                     averageInterval = 0L
 
-                                    // 重置過去七天，但保留日期
                                     pastSevenDaily = pastSevenDaily.map { (label, _, _) ->
-                                        Triple(label, 0.0, 0)  // 數值清空，日期保留
+                                        Triple(label, 0.0, 0)
                                     }
-                                    pastSevenTotal = 0.0
 
-                                    storage.clearClaims() // 仍可清空儲存的紀錄
-
-                                    //showDialog = false
+                                    storage.clearClaims()
                                     confirmDelete = false
                                 }) {
                                     Text("確定刪除")
@@ -1066,7 +931,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                 title = { Text("今日領取明細", fontSize = 14.sp) },
                 text = {
                     Column {
-                        // 標題列
                         Row(Modifier.fillMaxWidth()) {
                             Text("排序", modifier = Modifier.weight(0.2f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text("蝦幣", modifier = Modifier.weight(0.3f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -1079,16 +943,14 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 300.dp)
                         ) {
-                            // 按時間由近到遠
                             val sortedClaims = todayClaims.sortedByDescending { it.timestamp }
 
                             itemsIndexed(sortedClaims) { index, claim ->
                                 val timeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                                     .format(Date(claim.timestamp))
 
-                                // 計算與下一筆的時間差
                                 val diffString = if (index == sortedClaims.lastIndex) {
-                                    "----" // 最舊的沒有上一筆
+                                    "----"
                                 } else {
                                     val diffMs = sortedClaims[index].timestamp - sortedClaims[index + 1].timestamp
                                     val diffSec = diffMs / 1000
@@ -1098,7 +960,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                                 }
 
                                 Row(Modifier.fillMaxWidth()) {
-                                    // 排序改成反向顯示：最新那筆是最大數字
                                     Text("${sortedClaims.size - index}", modifier = Modifier.weight(0.2f), fontSize = 12.sp)
                                     Text("%.2f".format(claim.amount), modifier = Modifier.weight(0.3f), fontSize = 12.sp)
                                     Text(timeString, modifier = Modifier.weight(0.5f), fontSize = 12.sp)
@@ -1122,19 +983,17 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
         val lifecycleOwner = LocalLifecycleOwner.current
 
-        // 每次進入前景會重新檢查
         DisposableEffect(lifecycleOwner) {
 
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    val isRunning = MyAccessibilityService.isRunning
-                    Log.d("MyAccessibilityServiceMyAccessibilityService", "isRunning: $isRunning")
+                    val isRunningAc = MyAccessibilityService.isRunning
                     val isEnabled = context.isAccessibilityServiceEnabled(MyAccessibilityService::class.java)
                     isEnabledAcService = isEnabled
                     text3 = when {
-                        isEnabled && isRunning->
+                        isEnabled && isRunningAc->
                             "無障礙服務已啟用✅"
-                        isEnabled && !isRunning ->
+                        isEnabled && !isRunningAc ->
                             "無障礙服務 異常❌ 請重新開關"
                         else ->
                             "無障礙服務 未啟用❌ 請手動打開"
@@ -1152,7 +1011,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             text = text3,
             modifier = Modifier.padding(top = 12.dp)
                 .clickable {
-                    // 點擊後直接導航到設定頁面
                     context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 },
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -1165,63 +1023,18 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     @Composable
     fun DoubleBackToExitApp() {
-        var lastBackPressedTime by remember { mutableStateOf(0L) }
+        var lastBackPressedTime by remember { mutableLongStateOf(0L) }
         val exitInterval = 2000L
         val context = LocalContext.current
 
         BackHandler {
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastBackPressedTime < exitInterval) {
-                (context as? Activity)?.finish() // 直接結束 Activity
+                (context as? Activity)?.finish()
             } else {
                 lastBackPressedTime = currentTime
                 Toast.makeText(context, "再按一次返回鍵退出", Toast.LENGTH_SHORT).show()
             }
-        }
-    }
-
-    @SuppressLint("ServiceCast")
-    fun getScreenHeights(context: Context): Pair<Int, Int> {
-        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // API 30+
-            val metrics = WindowMetricsCalculator.getOrCreate().computeCurrentWindowMetrics(context)
-            val bounds = metrics.bounds
-            val realHeight = bounds.height()
-
-            val availableHeight = Resources.getSystem().displayMetrics.heightPixels
-
-            Pair(realHeight, availableHeight)
-        } else {
-            // API < 30
-            val display = windowManager.defaultDisplay
-            val realMetrics = DisplayMetrics()
-            display.getRealMetrics(realMetrics)
-            val realHeight = realMetrics.heightPixels
-
-            val availableMetrics = DisplayMetrics()
-            display.getMetrics(availableMetrics)
-            val availableHeight = availableMetrics.heightPixels
-
-            Pair(realHeight, availableHeight)
-        }
-    }
-
-    @SuppressLint("InternalInsetResource")
-    fun getNavigationBarHeight(context: Context): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // API 30 以上用 WindowInsets
-            val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val metrics = windowManager.currentWindowMetrics
-            val insets = metrics.windowInsets
-                .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
-
-            insets.bottom
-        } else {
-            // API 29 以下從資源中抓 navigation_bar_height
-            val resourceId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
-            if (resourceId > 0) context.resources.getDimensionPixelSize(resourceId) else 0
         }
     }
 
@@ -1245,7 +1058,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     }
 
     private fun startShopCoinService() {
-        //val serviceRunning = isServiceRunning(ScreenCaptureService::class.java)
         if (!MyAccessibilityService.isRunning) {
             Toast.makeText(this, "❌請先 打開 或 重開 無障礙服務", Toast.LENGTH_SHORT).show()
             return
@@ -1285,15 +1097,15 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
         }
     }
 
-    private fun SetDownValue(DownValue:Float){
-        if (DownValue <= 0.01f) {
+    private fun setDownValue(downValue:Float){
+        if (downValue <= 0.01f) {
             Toast.makeText(this, "底線值太小", Toast.LENGTH_SHORT).show()
             return
-        } else if  (DownValue >= 100f) {
+        } else if  (downValue >= 100f) {
             Toast.makeText(this, "底線值太大", Toast.LENGTH_SHORT).show()
             return
         }
-        GlobalValueHolder.DownValue = DownValue
+        GlobalValueHolder.DownValue = downValue
         Log.d("GlobalValueHolder", "DownValue ${GlobalValueHolder.DownValue}")
     }
 
@@ -1301,7 +1113,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     fun SwipeTuningDialog(onDismiss: () -> Unit) {
         AlertDialog(
             onDismissRequest = {
-                // 💡 點擊外部或返回時不主動停止測試，允許使用者切換到蝦皮觀察
                 onDismiss()
             },
             title = { Text("滑動參數調整") },
@@ -1346,7 +1157,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
             confirmButton = {
                 Button(onClick = {
                     saveSwipeSettings()
-                    // 💡 點擊「儲存」時不主動停止測試，方便使用者立刻切換 App
                     onDismiss()
                 }) {
                     Text("儲存並關閉")
@@ -1377,7 +1187,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     value = fText,
                     onValueChange = { 
                         fText = it
-                        it.toFloatOrNull()?.let { onFactorChange(it) }
+                        it.toFloatOrNull()?.let { factorVal -> onFactorChange(factorVal) }
                     },
                     label = { Text("距離係數", fontSize = 10.sp) },
                     modifier = Modifier.width(90.dp),
@@ -1388,7 +1198,7 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
                     value = lText,
                     onValueChange = { 
                         lText = it
-                        it.toLongOrNull()?.let { onLongChange(it) }
+                        it.toLongOrNull()?.let { longVal -> onLongChange(longVal) }
                     },
                     label = { Text("時間(ms)", fontSize = 10.sp) },
                     modifier = Modifier.width(90.dp),
@@ -1401,7 +1211,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Activity 銷毀時停止定時
         val stopIntent = Intent(this, FloatingButtonService::class.java)
         stopService(stopIntent)
         val stopIntent1 = Intent(this, ScreenCaptureService::class.java)
@@ -1411,17 +1220,6 @@ class MainActivity<ClaimRecord> : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Log.d("OCR_Result", "onResume")
-
-        /*if (MediaProjectionHolder.resultData != null && mediaProjection == null) {
-            val mediaProjectionManager =
-                getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = mediaProjectionManager.getMediaProjection(
-                MediaProjectionHolder.resultCode,
-                MediaProjectionHolder.resultData!!
-            )
-
-            Toast.makeText(this, "✅ 螢幕擷取授權成功", Toast.LENGTH_SHORT).show()
-        }*/
     }
 
     override fun onStop() {
