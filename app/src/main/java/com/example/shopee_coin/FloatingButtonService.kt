@@ -73,10 +73,15 @@ class FloatingButtonService : Service() {
         layoutParams.y = initY
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        // 💡 啟動時強制同步狀態：讓 isOn 變數與 Preferences 保持一致，並更新 UI
+        GlobalValueHolder.isOn = false 
         prefs.edit { putBoolean("OCR_ENABLED", false) }
         
         // 💡 載入上次自動停止的日期
         GlobalValueHolder.lastAutoStopDay = prefs.getInt("LAST_AUTO_STOP_DAY", -1)
+
+        // 💡 確保按鈕圖示與文字正確反映初始的 false 狀態
+        updateButtonUI()
 
 // 拖曳與點擊邏輯
         button.setOnTouchListener(object : View.OnTouchListener {
@@ -154,16 +159,20 @@ class FloatingButtonService : Service() {
     }
 
     private fun onFloatingButtonClick() {
-        //IsOn = !IsOn
         GlobalValueHolder.isOn = !GlobalValueHolder.isOn
+        updateButtonUI()
+        
+        val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        prefs.edit { putBoolean("OCR_ENABLED", GlobalValueHolder.isOn) }
+        Log.d("Float Button", "Feature FB ${GlobalValueHolder.isOn}")
+    }
+
+    private fun updateButtonUI() {
         if (GlobalValueHolder.isOn) {
             updateStatusText("已開啟")
         } else {
             updateStatusText("暫停")
         }
-        val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        prefs.edit { putBoolean("OCR_ENABLED", GlobalValueHolder.isOn) }
-        Log.d("Float Button", "Feature FB ${GlobalValueHolder.isOn}")
         val resId = if (GlobalValueHolder.isOn) R.drawable.on_button else R.drawable.off_button
         button.setImageResource(resId)
     }
