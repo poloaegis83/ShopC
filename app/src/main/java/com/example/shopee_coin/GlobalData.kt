@@ -55,6 +55,7 @@ object GlobalValueHolder {
     var prevMoveLong by mutableStateOf(DEFAULT_PREV_LONG)
 
     var isSwipeTesting by mutableStateOf(false)
+    var lastAutoStopDay by mutableStateOf(-1) // 💡 記錄上次觸發領滿自動停止的日期
 }
 
 var isEnabledAcService = true

@@ -19,7 +19,6 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import java.util.Calendar
 import kotlin.math.absoluteValue
@@ -75,6 +74,9 @@ class FloatingButtonService : Service() {
 
         val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         prefs.edit { putBoolean("OCR_ENABLED", false) }
+        
+        // 💡 載入上次自動停止的日期
+        GlobalValueHolder.lastAutoStopDay = prefs.getInt("LAST_AUTO_STOP_DAY", -1)
 
 // 拖曳與點擊邏輯
         button.setOnTouchListener(object : View.OnTouchListener {
@@ -276,7 +278,9 @@ class FloatingButtonService : Service() {
     }
 
     fun updateRecordTextToday() {
-        val todayStart = Calendar.getInstance().apply {
+        val calendar = Calendar.getInstance()
+        val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+        val todayStart = calendar.apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
@@ -290,6 +294,22 @@ class FloatingButtonService : Service() {
 
         Handler(Looper.getMainLooper()).post {
             recordText.text = "${todayCount}次, ${truncatedTotal}元"
+
+            // 💡 領滿 100 次自動停止邏輯 (每天僅限一次)
+            if (todayCount >= 100 && GlobalValueHolder.lastAutoStopDay != currentDay && GlobalValueHolder.isOn) {
+                GlobalValueHolder.lastAutoStopDay = currentDay
+                updateOnOff(false)
+                updateStatusText("今天已領滿")
+                
+                // 同步更新持久化狀態
+                val prefs = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+                prefs.edit { 
+                    putBoolean("OCR_ENABLED", false)
+                    putInt("LAST_AUTO_STOP_DAY", currentDay)
+                }
+                
+                Log.d("FloatingButtonService", "今日領取已達 100 次，執行自動停止")
+            }
         }
     }
 
