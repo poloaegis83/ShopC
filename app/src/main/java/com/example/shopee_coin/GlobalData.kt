@@ -81,11 +81,11 @@ data class CoinStrategy(
 
 val DefaultStrategies = listOf(
     //早上
-    CoinStrategy(8, 0, 11, 30, 0.3f, 0.2f, 0.1f, 5),
+    CoinStrategy(8, 0, 11, 30, 0.3f, 0.2f, 0.1f, 6),
     //中午
     CoinStrategy(11, 10, 13, 30, 0.4f, 0.25f, 0.05f,5),
     //下午
-    CoinStrategy(14, 0, 17, 40, 0.35f, 0.25f, 0.1f,5),
+    CoinStrategy(14, 0, 17, 40, 0.35f, 0.25f, 0.1f,6),
     //傍晚
     CoinStrategy(17, 40, 19, 30, 0.3f, 0.2f, 0.05f,5),
     //晚上
