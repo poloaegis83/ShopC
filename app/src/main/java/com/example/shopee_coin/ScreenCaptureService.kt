@@ -484,7 +484,7 @@ class ScreenCaptureService : Service() {
                         moveActionMutex.withLock {
                             repeat(stepsBack) {
                                 movePreviousPage()
-                                delay(5000L) // 等待動畫穩定
+                                delay(5500L) // 等待動畫穩定
                             }
                         }
                     } else {
@@ -1065,7 +1065,7 @@ class ScreenCaptureService : Service() {
 
                                                 coinValueToRecord = matches1.value.toFloat()
                                                 
-                                                // 💡 紀錄到歷史清單
+                                                // 💡 紀錄到歷史清單 (供回溯調用)
                                                 roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
                                                 
                                                 // 更新 Debug 資訊
@@ -1073,14 +1073,16 @@ class ScreenCaptureService : Service() {
                                                 GlobalValueHolder.debugLineText = line.text
                                                 GlobalValueHolder.debugLineVal = matches1.value
 
-                                                // 💡 無論是否符合門檻，只要找到了就暫時標記為發現，供後續階段判斷時間
-                                                if (nextState == CState.SEARCHING_COIN) {
-                                                    nextState = CState.COIN_VAULE_FIND
-                                                }
-
+                                                // 💡 只有符合門檻才標記為「發現」，否則不執行時間與領取邏輯
                                                 if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
                                                     Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
                                                     notFindConter = 0
+                                                    if (nextState == CState.SEARCHING_COIN) {
+                                                        nextState = CState.COIN_VAULE_FIND
+                                                    }
+                                                } else {
+                                                    Log.d("CoinValue", "低於門檻：$coinValueToRecord < ${GlobalValueHolder.coinValueSatisfy}")
+                                                    // nextState 保持 SEARCHING_COIN，這會觸發 PAGE_COIN_NOT_FIND 會去更新頁面
                                                 }
                                             }
                                         }
@@ -1092,21 +1094,18 @@ class ScreenCaptureService : Service() {
 
                     var isLoopBroken = false
 
-                    // 第三與第四階段：處理時間倒數與領取/重試按鈕 - 使用白色濾鏡
-                    // 3. 處理時間倒數 (第三階段)
-                    if (nextState == CState.COIN_VAULE_FIND && coinPositionX != 0f) {
+                    // 3. 處理時間倒數 (第三階段) - 💡 只有符合門檻或原本就在等的才「留下來等」
+                    if ((nextState == CState.COIN_VAULE_FIND || previousState == CState.WAITING_COIN) && coinPositionX != 0f) {
                         OuterTime@ for (block in whiteResult.textBlocks) {
                             for (line in block.lines) {
                                 val matches2 = regex2.find(line.text)
                                 if (matches2 != null) {
                                     val boxtRaw = line.boundingBox
                                     if (boxtRaw != null) {
-                                        // 💡 因為 whiteResult 是在 cutBitmap (1:1) 解析度下辨識，不需要 UpscaleRate
                                         val timey = realY(boxtRaw.top.toFloat(), 0f)
-                                        // 判斷時間是否在數字下方合理的範圍內
                                         if (timey <= coinPositionY + coinPositionHeight * 3.3f) {
                                             Log.d("RegexMatch", "第三階段：找到倒數時間 ${matches2.value} -> WAITING_COIN")
-                                            GlobalValueHolder.debugLineVal = matches2.value // 💡 紀錄找到的時間字串
+                                            GlobalValueHolder.debugLineVal = matches2.value
                                             nextState = CState.WAITING_COIN
                                             gFindCoinButNoTime = 0
                                             break@OuterTime
@@ -1117,10 +1116,10 @@ class ScreenCaptureService : Service() {
                         }
                     }
 
-                    // 4. 處理「領取」按鈕與「重試」(第四階段)
+                    // 4. 處理「領取」按鈕與「重試」(第四階段) - 💡 只要有按鈕出現，不論金額一律點擊
                     OuterReg@ for (block in whiteResult.textBlocks) {
                         for (line in block.lines) {
-                            // 2. 處理「領取」按鈕 (第四階段)
+                            // 處理「領取」按鈕
                             val matches3 = regex3.find(line.text)
                             if (matches3 != null) {
                                 val boxg = line.boundingBox
@@ -1128,21 +1127,19 @@ class ScreenCaptureService : Service() {
                                     val getCoinRightX = boxg.right.toFloat() + (screenshotWidth / 2f)
                                     val getCoinY = realY(boxg.centerY().toFloat(), 0f)
 
-                                    // 如果有偵測到數字，進行精確位置校驗；如果沒偵測到數字，也執行領取（提高相容性）
                                     val isPositionValid = if (coinPositionX != 0f) {
                                         val isRightSide = getCoinRightX > coinPositionX
                                         val tolerance = coinPositionHeight * 0.3f
                                         val isWithinYRange = getCoinY >= (coinPositionTop - tolerance) && getCoinY <= (coinPositionBottom + tolerance)
                                         isRightSide && isWithinYRange
                                     } else {
-                                        true // 沒看到數字座標，直接信任文字辨識結果
+                                        true
                                     }
 
                                     if (isPositionValid) {
-                                        Log.d("RegexMatch", "第四階段：找到領取按鈕 -> GET_COIN_READY")
+                                        Log.d("RegexMatch", "第四階段：找到領取按鈕 (不論金額一律領取) -> GET_COIN_READY")
                                         
                                         val targetClickX = boxg.right.toFloat() + (metrics.widthPixels / 2f)
-                                        // 更新 Debug 資訊
                                         GlobalValueHolder.debugGetPos = "(${targetClickX.toInt()},${getCoinY.toInt()})"
 
                                         nextState = CState.GET_COIN_READY
@@ -1156,7 +1153,6 @@ class ScreenCaptureService : Service() {
                                                 coinClaimStorage.addClaim(CoinClaim(amount = coinValueToRecord.toDouble()))
                                                 floatingService?.updateRecordTextToday()
                                                 
-                                                // 💡 領取成功的當下，重置門檻為該時段的 UpValue
                                                 val (tHour, tMins) = TimeLib.GetTime()
                                                 findCurrentStrategy(tHour, tMins, DefaultStrategies)?.let { strategy ->
                                                     GlobalValueHolder.coinValueSatisfy = strategy.periodUpValue
@@ -1171,7 +1167,7 @@ class ScreenCaptureService : Service() {
                                 }
                             }
 
-                            // 3. 處理「重試」按鈕 (第四階段)
+                            // 處理「重試」按鈕 (第四階段)
                             val matches4 = regex4.find(line.text)
                             if (matches4 != null) {
                                 Log.d("move", "第四階段：找到重試 -> quickRefreshPage")
