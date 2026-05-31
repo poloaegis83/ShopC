@@ -930,12 +930,11 @@ class ScreenCaptureService : Service() {
         // 進行第一階段辨識 (白色濾鏡)
         recognizeTextAndHandleGesture(whiteEnhanced) { whiteResult ->
             val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
-            val regex6 = Regex("[蝦轄遐].[直置真百].[任住低仟伴尫彺往仁].[獎賞]")
-            
+
             var foundHeader = false
             for (block in whiteResult.textBlocks) {
                 for (line in block.lines) {
-                    if (regex5.find(line.text) != null || regex6.find(line.text) != null) {
+                    if (regex5.find(line.text) != null) {
                         foundHeader = true
                         break
                     }
@@ -1000,7 +999,6 @@ class ScreenCaptureService : Service() {
         val regex3 = Regex("[領领須须後铁]取")
         val regex4 = Regex("^\\|?\\(?[重童垂][試拭詩]")
         val regex5 = Regex("[直置真百].[閁閂閃閉間閒閱间問简].?[蝦轄遐].")
-        val regex6 = Regex("[蝦轄遐].[直置真百].[任住低低仟伴尫彺往仁].[獎賞]") //蝦皮直播任務獎歷
 
         var coinPositionX  = 0f
         var coinPositionY  = 0f
@@ -1020,11 +1018,11 @@ class ScreenCaptureService : Service() {
                 try {
                     var headerBox: android.graphics.Rect? = null
 
-                    // 第一階段：確認 "直播間蝦幣" or "蝦皮直播任務獎歷" 是否存在 - 使用白色濾鏡
+                    // 第一階段：確認 "直播間蝦幣" 是否存在 - 使用白色濾鏡
                     for (block in whiteResult.textBlocks) {
                         for (line in block.lines) {
                             Log.d("CoinValue", "第一階段文字：${line.text}")
-                            if (regex5.find(line.text) != null || regex6.find(line.text) != null  ) {
+                            if (regex5.find(line.text) != null) {
                                 findLiveCoinHeader = true
                                 headerBox = line.boundingBox
                                 Log.d("CoinValue", "第一階段：找到直播間蝦幣標題，位置：$headerBox")
