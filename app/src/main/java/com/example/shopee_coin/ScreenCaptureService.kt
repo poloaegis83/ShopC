@@ -944,14 +944,12 @@ class ScreenCaptureService : Service() {
             }
 
             if (foundHeader) {
-                // 💡 只有找到標題才執行後續重型運算：金色濾鏡與放大
-                Log.d("HandleCoinCase", "找到蝦幣標題，執行後續金色濾鏡辨識")
+                // 💡 找到標題，執行後續重型運算：金色濾鏡與放大
+                Log.d("HandleCoinCase", "找到蝦幣標題，執行金色濾鏡辨識")
                 
-                // 2. 準備金色增強圖 (2倍放大，專攻數字)
                 val goldEnhanced = BitmapCropLib.toGoldEnhanced(cutBitmap)
                 val goldEnhancedUpscaled = BitmapCropLib.upscaleBitmap(goldEnhanced, upscaleRate.toInt())
 
-                // 💡 儲存圖片到相簿 (DCIM/ShopC_Debug) - 僅在 ImageDebug 開啟時
                 if (GlobalValueHolder.isImageDebugMode) {
                     BitmapCropLib.saveBitmapToGallery(this, goldEnhancedUpscaled, "GoldFilter")
                     BitmapCropLib.saveBitmapToGallery(this, whiteEnhanced, "WhiteFilter")
@@ -964,12 +962,16 @@ class ScreenCaptureService : Service() {
                 }, {
                     goldEnhanced.recycle()
                     goldEnhancedUpscaled.recycle()
+                    // 即使金色辨識失敗，也要跑大腦邏輯
+                    processCoinCase(null, whiteResult, bitmap.width)
                 })
             } else {
-                Log.d("HandleCoinCase", "未發現蝦幣標題，早退跳過後續運算")
+                // 💡 雖然沒標題，但processCoinCase 必須跑，否則不會翻頁
+                Log.d("HandleCoinCase", "未發現蝦幣標題，快速跳過金色運算，進入狀態更新")
+                processCoinCase(null, whiteResult, bitmap.width)
             }
+            cutBitmap.recycle() // 💡 補上小圖回收，防止記憶體洩漏
         }
-        // 注意：cutBitmap 在 recognizeTextAndHandleGesture 結束後會自動被其內部的 recycle 回收
     }
 
     private fun lastNotZero( value:String) :Boolean  // to check not 2.0 or 2.20 should be 2 or 2.2  最後一位不為0
@@ -991,7 +993,7 @@ class ScreenCaptureService : Service() {
 
     @SuppressLint("SuspiciousIndentation")
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun processCoinCase(goldResult: Text, whiteResult: Text, screenshotWidth: Int) {
+    private fun processCoinCase(goldResult: Text?, whiteResult: Text, screenshotWidth: Int) {
 
         val regex1 = Regex("([0-1]\\.\\d{1,2}|[1])")
         val regex2 = Regex("(10:00)|((0[0-9])(:\\d{0,2}))")
@@ -1032,52 +1034,54 @@ class ScreenCaptureService : Service() {
                     }
 
                     // 第二階段：若標題存在，尋找 蝦幣數字 (CoinValue) 並記錄位置 - 使用金色濾鏡
-                    for (block in goldResult.textBlocks) {
-                        if (findLiveCoinHeader && headerBox != null) {
-                            for (line in block.lines) {
-                                val matches1 = regex1.find(line.text)
-                                if (matches1 != null && lastNotZero(matches1.value)) {
-                                    val boxcRaw = line.boundingBox
-                                    if (boxcRaw != null) {
-                                        // 💡 因為 goldResult 是經過 UpscaleRate 倍縮放，座標需還原
-                                        val boxc = android.graphics.Rect(
-                                            (boxcRaw.left / upscaleRate).toInt(),
-                                            (boxcRaw.top / upscaleRate).toInt(),
-                                            (boxcRaw.right / upscaleRate).toInt(),
-                                            (boxcRaw.bottom / upscaleRate).toInt()
-                                        )
+                    if (goldResult != null) {
+                        for (block in goldResult.textBlocks) {
+                            if (findLiveCoinHeader && headerBox != null) {
+                                for (line in block.lines) {
+                                    val matches1 = regex1.find(line.text)
+                                    if (matches1 != null && lastNotZero(matches1.value)) {
+                                        val boxcRaw = line.boundingBox
+                                        if (boxcRaw != null) {
+                                            // 💡 因為 goldResult 是經過 UpscaleRate 倍縮放，座標需還原
+                                            val boxc = android.graphics.Rect(
+                                                (boxcRaw.left / upscaleRate).toInt(),
+                                                (boxcRaw.top / upscaleRate).toInt(),
+                                                (boxcRaw.right / upscaleRate).toInt(),
+                                                (boxcRaw.bottom / upscaleRate).toInt()
+                                            )
 
-                                        val currentHeader = headerBox
-                                        val isBelowHeader = boxc.centerY() > currentHeader.centerY()
-                                        val isWithinHorizontalBounds = boxc.centerX() >= currentHeader.left && boxc.centerX() <= currentHeader.right
+                                            val currentHeader = headerBox
+                                            val isBelowHeader = boxc.centerY() > currentHeader.centerY()
+                                            val isWithinHorizontalBounds = boxc.centerX() >= currentHeader.left && boxc.centerX() <= currentHeader.right
 
-                                        if (isBelowHeader && isWithinHorizontalBounds) {
-                                            Log.d("CoinValue", "第二階段：找到符合位置關係的數字 ${matches1.value}")
-                                            // cropToTopRightQuarter 的 X 偏移是寬度的一半，Y 偏移是 0
-                                            coinPositionX = (boxc.centerX()).toFloat() + (screenshotWidth / 2f)
-                                            coinPositionY = realY((boxc.centerY()).toFloat(), 0f)
-                                            coinPositionTop = realY(boxc.top.toFloat(), 0f)
-                                            coinPositionBottom = realY(boxc.bottom.toFloat(), 0f)
-                                            coinPositionHeight = boxc.height().toFloat()
+                                            if (isBelowHeader && isWithinHorizontalBounds) {
+                                                Log.d("CoinValue", "第二階段：找到符合位置關係的數字 ${matches1.value}")
+                                                // cropToTopRightQuarter 的 X 偏移是寬度的一半，Y 偏移是 0
+                                                coinPositionX = (boxc.centerX()).toFloat() + (screenshotWidth / 2f)
+                                                coinPositionY = realY((boxc.centerY()).toFloat(), 0f)
+                                                coinPositionTop = realY(boxc.top.toFloat(), 0f)
+                                                coinPositionBottom = realY(boxc.bottom.toFloat(), 0f)
+                                                coinPositionHeight = boxc.height().toFloat()
 
-                                            coinValueToRecord = matches1.value.toFloat()
-                                            
-                                            // 💡 紀錄到歷史清單
-                                            roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
-                                            
-                                            // 更新 Debug 資訊
-                                            GlobalValueHolder.debugCoinPosValue = "(${coinPositionX.toInt()},${coinPositionY.toInt()})($coinValueToRecord)"
-                                            GlobalValueHolder.debugLineText = line.text
-                                            GlobalValueHolder.debugLineVal = matches1.value
+                                                coinValueToRecord = matches1.value.toFloat()
+                                                
+                                                // 💡 紀錄到歷史清單
+                                                roomHistoryMap[currentRoomIndex] = Pair(coinValueToRecord, System.currentTimeMillis())
+                                                
+                                                // 更新 Debug 資訊
+                                                GlobalValueHolder.debugCoinPosValue = "(${coinPositionX.toInt()},${coinPositionY.toInt()})($coinValueToRecord)"
+                                                GlobalValueHolder.debugLineText = line.text
+                                                GlobalValueHolder.debugLineVal = matches1.value
 
-                                            // 💡 無論是否符合門檻，只要找到了就暫時標記為發現，供後續階段判斷時間
-                                            if (nextState == CState.SEARCHING_COIN) {
-                                                nextState = CState.COIN_VAULE_FIND
-                                            }
+                                                // 💡 無論是否符合門檻，只要找到了就暫時標記為發現，供後續階段判斷時間
+                                                if (nextState == CState.SEARCHING_COIN) {
+                                                    nextState = CState.COIN_VAULE_FIND
+                                                }
 
-                                            if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
-                                                Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
-                                                notFindConter = 0
+                                                if (coinValueToRecord >= GlobalValueHolder.coinValueSatisfy) {
+                                                    Log.d("CoinValue", "符合門檻：$coinValueToRecord >= ${GlobalValueHolder.coinValueSatisfy}")
+                                                    notFindConter = 0
+                                                }
                                             }
                                         }
                                     }
